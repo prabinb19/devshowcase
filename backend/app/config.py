@@ -1,0 +1,22 @@
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    database_url: str = "postgresql+asyncpg://postgres:dev@localhost:5432/devshowcase"
+    anthropic_api_key: str = ""
+    github_token: str = ""
+    e2b_api_key: str = ""
+    token_encryption_key: str = ""
+    r2_account_id: str = ""
+    r2_access_key_id: str = ""
+    r2_secret_access_key: str = ""
+    r2_bucket_name: str = ""
+    linkedin_client_id: str = ""
+    linkedin_client_secret: str = ""
+    checkpoint_url: str = "postgresql://postgres:dev@localhost:5432/devshowcase"
+    rate_limit_runs_per_hour: int = 10
+
+    model_config = {"env_file": ".env", "extra": "ignore"}
+
+
+settings = Settings()
