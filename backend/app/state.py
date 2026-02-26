@@ -18,6 +18,7 @@ class RepoMetadata(BaseModel):
     language: str = ""
     topics: list[str] = []
     url: str = ""
+    default_branch: str = "main"
 
 
 class RepoContext(BaseModel):

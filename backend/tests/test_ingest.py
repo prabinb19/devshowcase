@@ -96,6 +96,7 @@ class TestFetchRepoMetadata:
                 "language": "Python",
                 "topics": ["web", "api"],
                 "html_url": "https://github.com/owner/myrepo",
+                "default_branch": "main",
             },
             request=httpx.Request("GET", "https://api.github.com/repos/owner/myrepo"),
         )
@@ -114,6 +115,33 @@ class TestFetchRepoMetadata:
         assert result["forks"] == 5
         assert result["language"] == "Python"
         assert result["topics"] == ["web", "api"]
+        assert result["default_branch"] == "main"
+
+    async def test_returns_non_standard_default_branch(self) -> None:
+        mock_resp = httpx.Response(
+            200,
+            json={
+                "name": "myrepo",
+                "description": "A project with develop branch",
+                "stargazers_count": 10,
+                "forks_count": 1,
+                "language": "Go",
+                "topics": [],
+                "html_url": "https://github.com/owner/myrepo",
+                "default_branch": "develop",
+            },
+            request=httpx.Request("GET", "https://api.github.com/repos/owner/myrepo"),
+        )
+        with patch(
+            "app.services.github_client._get_client"
+        ) as mock_get_client:
+            client = AsyncMock()
+            client.get = AsyncMock(return_value=mock_resp)
+            mock_get_client.return_value = client
+
+            result = await fetch_repo_metadata("owner", "myrepo")
+
+        assert result["default_branch"] == "develop"
 
 
 # ── README fetch tests ──
@@ -299,6 +327,11 @@ class TestExtractReadmeImages:
         )
         result = extract_readme_images(md)
         assert result == ["https://example.com/logo.png", "other.png"]
+
+    def test_strips_title_text(self) -> None:
+        md = '![logo](https://example.com/logo.png "Project Logo")'
+        result = extract_readme_images(md)
+        assert result == ["https://example.com/logo.png"]
 
     def test_no_images(self) -> None:
         assert extract_readme_images("Just text, no images.") == []

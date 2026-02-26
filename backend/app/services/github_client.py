@@ -28,7 +28,7 @@ _CONFIG_FILENAMES = frozenset({
 _MAX_TREE_ENTRIES = 10_000
 _MAX_CONFIG_SIZE = 50 * 1024  # 50 KB
 
-_MD_IMAGE_RE = re.compile(r"!\[[^\]]*\]\(([^)]+)\)")
+_MD_IMAGE_RE = re.compile(r"!\[[^\]]*\]\(([^\s)]+)")
 _HTML_IMG_RE = re.compile(r'<img\s[^>]*src=["\']([^"\']+)["\']', re.IGNORECASE)
 
 # ── Module-level client (lazy singleton) ──
@@ -105,6 +105,7 @@ async def fetch_repo_metadata(owner: str, repo: str) -> dict:
         "language": data.get("language") or "",
         "topics": data.get("topics", []),
         "url": data.get("html_url", ""),
+        "default_branch": data.get("default_branch", "main"),
     }
 
 
