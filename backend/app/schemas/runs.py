@@ -28,6 +28,7 @@ class RunDetailResponse(BaseModel):
     repo_context: dict | None = None
     analysis: dict | None = None
     screenshots: dict | None = None
+    post_draft: dict | None = None
     created_at: datetime
     updated_at: datetime
 

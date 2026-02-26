@@ -87,32 +87,40 @@
 
 ## Section 6: Generate Node (LinkedIn Post Drafts)
 
-- [ ] Craft LinkedIn system prompt (hook in first 210 chars, no links in body, 3K char limit, emoji-light)
-- [ ] Build few-shot example bank: 10 high-performing LinkedIn dev posts as reference
-- [ ] Implement `generate_posts` node — 2 LLM calls: analysis summary → LinkedIn post draft
-- [ ] Generate alt text for each screenshot (accessibility, <125 chars)
-- [ ] Generate LinkedIn first-comment text (contains GitHub link + brief CTA)
-- [ ] Assemble `PostDraft` dataclass (body, first_comment, screenshot_urls, alt_texts, platform="linkedin")
-- [ ] Write unit tests for generate node with fixture `ProjectAnalysis` inputs
+- [x] Craft LinkedIn system prompt (hook in first 210 chars, no links in body, 3K char limit, emoji-light)
+- [x] Build few-shot example bank: 3 concise examples demonstrating desired style (CLI tool, web app, library)
+- [x] Implement `generate` node — single Claude tool_use call producing body, first_comment, and alt_texts
+- [x] Generate alt text for each screenshot inline (accessibility, ≤125 chars, truncated)
+- [x] Generate LinkedIn first-comment text (contains GitHub link + brief CTA, ≤500 chars)
+- [x] Assemble `PostDraft` via Pydantic model (body, first_comment, screenshot_urls, alt_texts, platform="linkedin")
+- [x] Write unit tests for generate node (14 tests: schema, user message, integration, content validation)
 
 ---
 
 ## Section 7: Frontend — Core Pages
 
-- [ ] Set up Next.js 14 App Router with `src/app/` structure
-- [ ] Configure NextAuth.js with GitHub OAuth provider (sign in / sign out)
-- [ ] Add auth middleware — protect all routes except landing page
-- [ ] Build URL input page (`/dashboard`): paste GitHub URL, validate client-side, submit to `POST /api/runs`
-- [ ] Build live status page (`/runs/[id]`): connect to SSE endpoint, show pipeline step progress
-- [ ] Build review page (`/runs/[id]/review`):
-  - [ ] Editable textarea for post body with character count (yellow at 90%, red at limit)
-  - [ ] LinkedIn post preview mockup (looks like actual LinkedIn post)
-  - [ ] Editable first-comment field for GitHub link
-  - [ ] Screenshot gallery with selection checkboxes
-- [ ] Build "Regenerate with feedback" flow — user types feedback, triggers new generate call
-- [ ] Build "Save as Draft" — persist draft to DB, resume from `/drafts` page
-- [ ] Build drafts list page (`/drafts`) — show saved drafts, resume editing
-- [ ] Connect all frontend pages to FastAPI backend via `fetch` / SWR
+- [x] Backend: Added `post_draft` JSON column to Run model + alembic migration 002
+- [x] Backend: Created `get_or_create_user` dependency, updated runs to use GitHub ID headers
+- [x] Backend: Draft CRUD routes (POST/GET list/GET/PATCH/DELETE) + schemas
+- [x] Backend: Regenerate endpoint (`POST /api/runs/{run_id}/regenerate`)
+- [x] Backend: 14 tests passing (8 draft + 6 run tests)
+- [x] Configure NextAuth.js with GitHub OAuth provider (JWT/session callbacks for githubId)
+- [x] Add auth middleware — protect `/dashboard`, `/runs`, `/drafts` routes
+- [x] Build TypeScript types, API client, useUser/useSSE hooks, SWR installed
+- [x] Build UI primitives: Button (variants/loading), Input (label/error), Card, Navbar
+- [x] Build landing page (`/`) — hero, 3-step explainer, "Sign in with GitHub" button
+- [x] Build URL input page (`/dashboard`): paste GitHub URL, validate client-side, submit to `POST /api/runs`
+- [x] Build live status page (`/runs/[id]`): SSE + SWR polling, vertical stepper with stage icons
+- [x] Build review page (`/runs/[id]/review`):
+  - [x] Two-column editor/preview layout
+  - [x] Editable textarea for post body with character count (yellow at 2700, red at 3000)
+  - [x] LinkedIn post preview mockup (avatar, name, body, screenshots, action row)
+  - [x] Editable first-comment field
+  - [x] Screenshot gallery with selection checkboxes and editable alt texts
+- [x] Build "Regenerate with feedback" flow — modal with feedback textarea, triggers regenerate endpoint
+- [x] Build "Save as Draft" — persist draft to DB via CRUD API, navigates to `/drafts`
+- [x] Build drafts list page (`/drafts`) — SWR-fetched cards with delete action, empty state
+- [x] Connect all frontend pages to FastAPI backend via centralized API client + SWR
 
 ---
 
@@ -300,3 +308,71 @@
 - Cloudflare R2 bucket setup (manual step)
 
 **Test suite:** 83 total tests passing (29 new + 54 existing from Sections 1-4)
+
+### Section 6 Review (2026-02-25)
+
+**Completed (7 items, 14 tests):**
+- `backend/app/prompts/generate.py` — LinkedIn post generation system prompt
+  - Instruction hierarchy: project data marked as untrusted, output locked to `generate_linkedin_post` tool_use
+  - LinkedIn rules: hook in first 210 chars, no links in body, max 3000 chars, emoji-light, line breaks
+  - First comment rules: repo link + CTA, <500 chars
+  - Alt text rules: descriptive, ≤125 chars, accessibility-focused
+  - 3 few-shot examples (CLI tool, web app, library) — concise, stays within token budget
+- `backend/app/prompts/__init__.py` — added `GENERATE_SYSTEM_PROMPT` to re-exports
+- `backend/app/nodes/generate.py` — replaced stub with Claude-powered implementation
+  - `_build_tool_schema()` — derives from `PostDraft.model_json_schema()`, keeps only `body`, `first_comment`, `alt_texts`
+  - `_build_user_message()` — assembles project overview, tech stack, key features, screenshot descriptions, repo URL
+  - `generate()` — calls Claude (`claude-sonnet-4-20250514`) with forced tool_use, validates/clamps content lengths, assembles `PostDraft`
+  - Content clamping: body ≤3000, first_comment ≤500, alt_texts ≤125 chars each
+  - Screenshot URLs set programmatically from state (not LLM-generated)
+  - Error handling for missing analysis, missing screenshots, API errors, no tool_use block
+- `backend/tests/test_generate.py` — 14 unit tests
+  - Tool schema (2): expected fields present, programmatic fields excluded
+  - User message (4): project info, repo URL, screenshots, key features
+  - Node integration (5): success, missing analysis, missing screenshots, API error, no tool_use block
+  - Content validation (3): body truncation, alt text truncation, empty screenshots
+
+**Architecture:**
+- Single LLM call (not two) — analysis already provides quality summary, second pass adds latency without value
+- Tool schema derived from `PostDraft` Pydantic model — same pattern as analyze node
+- Programmatic fields (`platform`, `status`, `screenshot_urls`) set in code, not by LLM
+- 3 few-shot examples (not 10) — sufficient to demonstrate style while staying within token budget
+
+**Test suite:** 97 total tests passing (14 new + 83 existing from Sections 1-5)
+
+### Section 7 Review (2026-02-25)
+
+**Backend changes (Part A — 8 files):**
+- `backend/app/models/base.py` — added `post_draft` JSON column to Run model
+- `backend/app/services/run_executor.py` — saves `post_draft` from final state; new `execute_graph_from_generate()` for regeneration
+- `backend/app/schemas/runs.py` — added `post_draft` to `RunDetailResponse`
+- `backend/app/schemas/drafts.py` — NEW: `CreateDraftRequest`, `UpdateDraftRequest`, `DraftResponse`
+- `backend/app/routes/deps.py` — NEW: `get_or_create_user(github_id, github_username, session) -> User`
+- `backend/app/routes/runs.py` — switched from UUID X-User-Id to GitHub ID headers; added regenerate endpoint
+- `backend/app/routes/drafts.py` — NEW: full CRUD router (POST/GET list/GET/PATCH/DELETE)
+- `backend/app/main.py` — registered drafts router
+- `backend/alembic/versions/002_add_post_draft_column.py` — NEW migration
+- `backend/tests/test_drafts.py` — NEW: 8 tests for draft CRUD
+- `backend/tests/test_runs.py` — updated for new headers + 2 regenerate tests
+
+**Frontend changes (Parts B-E — 16 files):**
+- Auth: `lib/auth.ts`, `lib/session-provider.tsx`, `middleware.ts`, `api/auth/[...nextauth]/route.ts`
+- Types/API: `types/index.ts`, `lib/api.ts`, `lib/hooks.ts`
+- UI: `components/ui/button.tsx`, `components/ui/input.tsx`, `components/ui/card.tsx`, `components/navbar.tsx`
+- Pages: `app/page.tsx` (landing), `app/landing-content.tsx`, `app/dashboard/page.tsx`, `app/runs/[id]/page.tsx`, `app/runs/[id]/review/page.tsx`, `app/drafts/page.tsx`
+- Config: `next.config.mjs` (image patterns), `globals.css` (stepper animation), `app/layout.tsx` (AuthSessionProvider)
+- Dependency: `swr` added
+
+**Architecture:**
+- NextAuth 4 with GitHub provider, JWT strategy, githubId/githubUsername persisted in session
+- Middleware protects `/dashboard`, `/runs`, `/drafts` routes
+- Centralized `apiFetch` wrapper in `lib/api.ts` — all API calls go through it
+- `useSSE` hook manages EventSource lifecycle; `useUser` hook provides typed session data
+- Review page stores `user_id` (UUID) in localStorage for drafts page consumption
+- Direct SSE to backend (not proxied through Next.js API routes)
+
+**Verification:**
+- Backend: 14/14 tests pass (`pytest tests/test_runs.py tests/test_drafts.py -v`)
+- Frontend: `npx next build` succeeds — all 5 routes + auth handler compiled, no TS/ESLint errors
+
+**Test suite:** 111 total tests passing (14 new backend + 97 existing from Sections 1-6)

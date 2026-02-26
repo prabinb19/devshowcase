@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import logging
 import uuid
+from typing import Any
 
 from sqlalchemy import select
 
 from app.database import async_session
 from app.graph import compiled_graph
 from app.models import Run, RunStatus
+from app.nodes.generate import generate
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +59,7 @@ async def execute_graph(
                 run.repo_context = final_state.get("repo_context")
                 run.analysis = final_state.get("analysis")
                 run.screenshots = final_state.get("screenshots")
+                run.post_draft = final_state.get("post_draft")
 
             await session.commit()
 
@@ -68,4 +71,49 @@ async def execute_graph(
             if run:
                 run.status = RunStatus.failed
                 run.error = "Internal pipeline error"
+                await session.commit()
+
+
+async def execute_graph_from_generate(
+    run_id: uuid.UUID,
+    repo_context: dict[str, Any] | None,
+    analysis: dict[str, Any] | None,
+    screenshots: list[dict[str, Any]] | None,
+    user_feedback: str,
+) -> None:
+    """Re-run only the generate node with user feedback. Called via asyncio.create_task()."""
+    state = {
+        "run_id": str(run_id),
+        "repo_context": repo_context or {},
+        "analysis": analysis or {},
+        "screenshots": screenshots or [],
+        "user_feedback": user_feedback,
+    }
+
+    try:
+        result = await generate(state)
+
+        async with async_session() as session:
+            db_result = await session.execute(select(Run).where(Run.id == run_id))
+            run = db_result.scalar_one_or_none()
+            if not run:
+                return
+
+            if result.get("error"):
+                run.status = RunStatus.failed
+                run.error = result["error"]
+            else:
+                run.status = RunStatus.completed
+                run.post_draft = result.get("post_draft")
+
+            await session.commit()
+
+    except Exception:
+        logger.exception("Unhandled error in regenerate run %s", run_id)
+        async with async_session() as session:
+            db_result = await session.execute(select(Run).where(Run.id == run_id))
+            run = db_result.scalar_one_or_none()
+            if run:
+                run.status = RunStatus.failed
+                run.error = "Internal regeneration error"
                 await session.commit()

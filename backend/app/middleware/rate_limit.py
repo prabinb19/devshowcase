@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
 from datetime import datetime, timedelta, timezone
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
@@ -16,7 +15,7 @@ from app.models import Run
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
-    """Limits POST /api/runs to N per hour per user (via X-User-Id header)."""
+    """Limits POST /api/runs to N per hour per user (via X-GitHub-Id header)."""
 
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
@@ -24,18 +23,23 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if request.method != "POST" or request.url.path != "/api/runs":
             return await call_next(request)
 
-        user_id_header = request.headers.get("X-User-Id")
-        if not user_id_header:
-            return await call_next(request)
-
-        try:
-            user_id = uuid.UUID(user_id_header)
-        except ValueError:
+        github_id = request.headers.get("X-GitHub-Id")
+        if not github_id:
             return await call_next(request)
 
         one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
 
         async with async_session() as session:
+            # Count recent runs by looking up the user's UUID from github_id
+            from app.models import User
+            user_result = await session.execute(
+                select(User.id).where(User.github_id == github_id)
+            )
+            user_id = user_result.scalar_one_or_none()
+            if not user_id:
+                # New user — no runs yet, allow
+                return await call_next(request)
+
             result = await session.execute(
                 select(func.count(Run.id)).where(
                     Run.user_id == user_id,
