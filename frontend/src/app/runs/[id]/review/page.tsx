@@ -8,7 +8,14 @@ import { Navbar } from "@/components/navbar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/lib/hooks";
-import { getRun, regenerateRun, createDraft } from "@/lib/api";
+import {
+  getRun,
+  regenerateRun,
+  createDraft,
+  getLinkedInStatus,
+  getLinkedInAuthUrl,
+  publishToLinkedIn,
+} from "@/lib/api";
 
 export default function ReviewPage() {
   const params = useParams();
@@ -26,6 +33,8 @@ export default function ReviewPage() {
   const [regenerating, setRegenerating] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [feedback, setFeedback] = useState("");
+  const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
 
   // Initialize state from run data once loaded
   const draft = run?.post_draft;
@@ -107,6 +116,59 @@ export default function ReviewPage() {
       router.push(`/runs/${data.run_id}`);
     } catch {
       setRegenerating(false);
+    }
+  }
+
+  async function handlePublish() {
+    if (!run || !user) return;
+
+    // Store user UUID
+    if (typeof window !== "undefined") {
+      localStorage.setItem("devshowcase_user_id", run.user_id);
+    }
+
+    setPublishing(true);
+    setPublishError(null);
+
+    try {
+      // Check LinkedIn connection status
+      const status = await getLinkedInStatus(user.githubId, user.githubUsername);
+      if (!status.connected) {
+        // Redirect to LinkedIn OAuth
+        const { auth_url } = await getLinkedInAuthUrl();
+        window.location.href = auth_url;
+        return;
+      }
+
+      // Save as draft first
+      const selectedUrls = draft?.screenshot_urls.filter((_, i) => selectedScreenshots.has(i)) ?? [];
+      const selectedAlts = displayAltTexts.filter((_, i) => selectedScreenshots.has(i));
+
+      const savedDraft = await createDraft({
+        run_id: run.id,
+        user_id: run.user_id,
+        body: displayBody,
+        first_comment: displayComment || undefined,
+        screenshot_urls: selectedUrls.length > 0 ? selectedUrls : undefined,
+        alt_texts: selectedAlts.length > 0 ? selectedAlts : undefined,
+      });
+
+      // Publish the draft
+      const result = await publishToLinkedIn(
+        savedDraft.id,
+        user.githubId,
+        user.githubUsername
+      );
+
+      if (result.success) {
+        router.push("/history");
+      } else {
+        setPublishError(result.error ?? "Publishing failed");
+        setPublishing(false);
+      }
+    } catch {
+      setPublishError("Failed to publish. Please try again.");
+      setPublishing(false);
     }
   }
 
@@ -286,16 +348,24 @@ export default function ReviewPage() {
         </div>
 
         {/* Action Buttons */}
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Button variant="secondary" onClick={() => setShowFeedbackModal(true)}>
-            Regenerate with Feedback
-          </Button>
-          <Button loading={saving} onClick={handleSaveDraft}>
-            Save as Draft
-          </Button>
-          <Button variant="ghost" onClick={handleDiscard}>
-            Discard
-          </Button>
+        <div className="mt-8 flex flex-col gap-3">
+          <div className="flex flex-wrap gap-3">
+            <Button loading={publishing} onClick={handlePublish}>
+              Publish to LinkedIn
+            </Button>
+            <Button variant="secondary" onClick={() => setShowFeedbackModal(true)}>
+              Regenerate with Feedback
+            </Button>
+            <Button variant="secondary" loading={saving} onClick={handleSaveDraft}>
+              Save as Draft
+            </Button>
+            <Button variant="ghost" onClick={handleDiscard}>
+              Discard
+            </Button>
+          </div>
+          {publishError && (
+            <p className="text-sm text-red-600">{publishError}</p>
+          )}
         </div>
 
         {/* Feedback Modal */}

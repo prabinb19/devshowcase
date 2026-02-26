@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     r2_bucket_name: str = ""
     linkedin_client_id: str = ""
     linkedin_client_secret: str = ""
+    linkedin_redirect_uri: str = "http://localhost:3000/api/linkedin/callback"
     checkpoint_url: str = "postgresql://postgres:dev@localhost:5432/devshowcase"
     rate_limit_runs_per_hour: int = 10
 

@@ -78,3 +78,14 @@ export interface SSEEvent {
   stage: string;
   message: string;
 }
+
+export interface LinkedInStatus {
+  connected: boolean;
+  expires_at: string | null;
+}
+
+export interface PublishResponse {
+  success: boolean;
+  post_url: string | null;
+  error: string | null;
+}

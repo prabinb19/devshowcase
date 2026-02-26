@@ -31,6 +31,12 @@ export function Navbar() {
             >
               Drafts
             </Link>
+            <Link
+              href="/history"
+              className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+            >
+              History
+            </Link>
           </div>
         </div>
         {user && (

@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
-from app.models import Draft
+from app.models import Draft, DraftStatus
 from app.schemas.drafts import CreateDraftRequest, DraftResponse, UpdateDraftRequest
 
 router = APIRouter(prefix="/drafts", tags=["drafts"])
@@ -37,12 +37,14 @@ async def create_draft(
 @router.get("", response_model=list[DraftResponse])
 async def list_drafts(
     user_id: uuid.UUID = Query(...),
+    status: DraftStatus | None = Query(None),
     session: AsyncSession = Depends(get_session),
 ) -> list[DraftResponse]:
-    """List drafts for a given user."""
-    result = await session.execute(
-        select(Draft).where(Draft.user_id == user_id)
-    )
+    """List drafts for a given user, optionally filtered by status."""
+    query = select(Draft).where(Draft.user_id == user_id)
+    if status is not None:
+        query = query.where(Draft.status == status)
+    result = await session.execute(query)
     drafts = result.scalars().all()
     return [DraftResponse.model_validate(d) for d in drafts]
 

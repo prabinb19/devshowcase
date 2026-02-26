@@ -84,3 +84,48 @@ export function updateDraft(
 export function deleteDraft(draftId: string) {
   return apiFetch<void>(`/api/drafts/${draftId}`, { method: "DELETE" });
 }
+
+// LinkedIn
+export function getLinkedInAuthUrl() {
+  return apiFetch<{ auth_url: string }>("/api/linkedin/auth-url");
+}
+
+export function getLinkedInStatus(githubId: string, githubUsername: string) {
+  return apiFetch<import("@/types").LinkedInStatus>("/api/linkedin/status", {
+    headers: {
+      "X-GitHub-Id": githubId,
+      "X-GitHub-Username": githubUsername,
+    },
+  });
+}
+
+export function publishToLinkedIn(
+  draftId: string,
+  githubId: string,
+  githubUsername: string
+) {
+  return apiFetch<import("@/types").PublishResponse>("/api/linkedin/publish", {
+    method: "POST",
+    headers: {
+      "X-GitHub-Id": githubId,
+      "X-GitHub-Username": githubUsername,
+    },
+    body: JSON.stringify({ draft_id: draftId }),
+  });
+}
+
+export function disconnectLinkedIn(githubId: string, githubUsername: string) {
+  return apiFetch<void>("/api/linkedin/disconnect", {
+    method: "DELETE",
+    headers: {
+      "X-GitHub-Id": githubId,
+      "X-GitHub-Username": githubUsername,
+    },
+  });
+}
+
+export function listDraftsByStatus(userId: string, status: string) {
+  return apiFetch<import("@/types").Draft[]>(
+    `/api/drafts?user_id=${userId}&status=${status}`
+  );
+}
