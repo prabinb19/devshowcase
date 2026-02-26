@@ -38,28 +38,28 @@
 
 ## Section 3: Ingest Node (GitHub API)
 
-- [ ] Implement GitHub URL validation with strict regex (`github.com/{owner}/{repo}`)
-- [ ] Add SSRF prevention — reject private IPs, localhost, non-GitHub hosts
-- [ ] Fetch repo metadata via GitHub REST API (`GET /repos/{owner}/{repo}`)
-- [ ] Fetch and base64-decode README content (`GET /repos/{owner}/{repo}/readme`)
-- [ ] Fetch recursive file tree (`GET /repos/{owner}/{repo}/git/trees/{sha}?recursive=1`, cap 10K entries)
-- [ ] Fetch key config files: `package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `requirements.txt` (<50KB each)
-- [ ] Extract image URLs from README markdown (regex for `![alt](url)` and `<img src>`)
-- [ ] Assemble `RepoContext` dataclass with all fetched data
-- [ ] Write unit tests for ingest node with fixture API responses (public repo, private repo, missing README)
+- [x] Implement GitHub URL validation with strict regex (`github.com/{owner}/{repo}`)
+- [x] Add SSRF prevention — reject private IPs, localhost, non-GitHub hosts
+- [x] Fetch repo metadata via GitHub REST API (`GET /repos/{owner}/{repo}`)
+- [x] Fetch and base64-decode README content (`GET /repos/{owner}/{repo}/readme`)
+- [x] Fetch recursive file tree (`GET /repos/{owner}/{repo}/git/trees/{sha}?recursive=1`, cap 10K entries)
+- [x] Fetch key config files: `package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `requirements.txt` (<50KB each)
+- [x] Extract image URLs from README markdown (regex for `![alt](url)` and `<img src>`)
+- [x] Assemble `RepoContext` dataclass with all fetched data
+- [x] Write unit tests for ingest node with fixture API responses (public repo, private repo, missing README)
 
 ---
 
 ## Section 4: Analyze Node (Claude LLM)
 
-- [ ] Write analysis system prompt with prompt injection defenses (instruction hierarchy, output format lock)
-- [ ] Implement `analyze_project` node using Anthropic SDK `client.messages.create()` directly
-- [ ] Use `tool_use` to get structured `ProjectAnalysis` output (project name, summary, tech stack, highlights, category)
-- [ ] Add README truncation to 8K tokens max before sending to LLM
-- [ ] Cap file tree at 500 entries before sending to LLM
-- [ ] Implement screenshot strategy determination (web app → sandbox, has README images → extract, fallback → project card)
-- [ ] Add content moderation check — filter secrets, API keys, credentials from context before LLM call
-- [ ] Write unit tests for analyze node with fixture `RepoContext` inputs
+- [x] Write analysis system prompt with prompt injection defenses (instruction hierarchy, output format lock)
+- [x] Implement `analyze_project` node using Anthropic SDK `client.messages.create()` directly
+- [x] Use `tool_use` to get structured `ProjectAnalysis` output (project name, summary, tech stack, highlights, category)
+- [x] Add README truncation to 8K tokens max before sending to LLM
+- [x] Cap file tree at 500 entries before sending to LLM
+- [x] Implement screenshot strategy determination (web app → sandbox, has README images → extract, fallback → project card)
+- [x] Add content moderation check — filter secrets, API keys, credentials from context before LLM call
+- [x] Write unit tests for analyze node with fixture `RepoContext` inputs
 
 ---
 
@@ -190,3 +190,68 @@
 - Two Postgres drivers coexist: asyncpg (SQLAlchemy) + psycopg3 (LangGraph checkpointer)
 - `compiled_graph` is a module-level singleton initialized during FastAPI lifespan
 - pytest-asyncio set to `auto` mode in pyproject.toml
+
+### Section 3 Review (2026-02-25)
+
+**Completed (9 items):**
+- `backend/app/services/github_client.py` — new shared async GitHub API client
+  - `parse_github_url()` with strict regex for `github.com/{owner}/{repo}` (supports `.git` suffix, trailing slash)
+  - `_validate_url()` SSRF prevention — only allows `github.com` / `www.github.com` hosts, rejects private/loopback IPs
+  - `_get_client()` lazy singleton `httpx.AsyncClient` with Bearer token auth, 30s timeout
+  - `fetch_repo_metadata()` — maps API response to RepoMetadata dict shape
+  - `fetch_readme()` — base64-decodes content, returns `""` on 404
+  - `fetch_file_tree()` — recursive tree capped at 10K entries, falls back from `main` to `master` branch
+  - `fetch_config_files()` — fetches 5 known config files if present in tree and <50KB
+  - `extract_readme_images()` — regex for `![alt](url)` and `<img src="url">` with deduplication
+- `backend/app/nodes/ingest.py` — replaced stub with real implementation
+  - Validates URL, fetches all data, assembles `repo_context` dict
+  - Error propagation via `error` key in state (triggers graph error_handler routing)
+  - Handles `HTTPStatusError` (404/403/etc) and `HTTPError` (network) with descriptive messages
+- `backend/tests/test_ingest.py` — 29 unit tests, all passing
+  - URL parsing (9), SSRF prevention (4), fetch functions (9), image extraction (4), ingest node integration (3)
+  - All tests use mocked httpx — no real API calls, no GitHub token required
+
+**Architecture:**
+- All GitHub API logic in `services/github_client.py`, ingest node is a thin orchestrator
+- Module-level `httpx.AsyncClient` singleton reuses connection pool across requests
+- SSRF check is host-based only (no DNS resolution needed since we restrict to github.com)
+
+**Test suite:** 33 total tests passing (29 new + 4 existing from Section 2)
+
+### Section 4 Review (2026-02-25)
+
+**Completed (8 items):**
+- `backend/app/services/llm_client.py` — new lazy singleton Anthropic client
+  - `get_anthropic_client()` mirrors `github_client.py` pattern with `settings.anthropic_api_key`
+  - Reusable for future nodes (generate, etc.)
+- `backend/app/prompts/analyze.py` — system prompt with security defenses
+  - Instruction hierarchy: repo content marked as untrusted data, not instructions
+  - Output format locked to `extract_project_analysis` tool_use only
+  - Analysis rules for all ProjectAnalysis fields (project_type enum, visual_type classification, etc.)
+- `backend/app/prompts/__init__.py` — re-exports `ANALYZE_SYSTEM_PROMPT`
+- `backend/app/nodes/analyze.py` — replaced stub with real Claude-powered implementation
+  - `_redact_secrets()` — regex patterns for AWS keys, GitHub PATs, OpenAI keys, PEM keys, generic credentials
+  - `_truncate_readme()` — caps at 32K chars (~8K tokens at 4 chars/token)
+  - `_cap_file_tree()` — limits to 500 entries
+  - `_determine_screenshot_strategy()` — deterministic: web→sandbox, has images→readme_images, fallback→project_card
+  - `_build_tool_schema()` — derives from `ProjectAnalysis.model_json_schema()`, excludes `screenshot_strategy`
+  - `_build_user_message()` — assembles metadata + redacted README + capped tree + redacted configs
+  - `analyze()` — calls Claude (`claude-sonnet-4-20250514`) with forced tool_use, validates via Pydantic, returns structured analysis
+  - Error handling returns `{"error": ..., "current_stage": "analyzing"}` (same pattern as ingest)
+- `backend/tests/test_analyze.py` — 21 unit tests, all passing
+  - Secret redaction (6): AWS keys, GitHub PATs, OpenAI keys, PEM keys, generic credentials, normal text preserved
+  - README truncation (2): short unchanged, long truncated with marker
+  - File tree capping (2): under limit unchanged, over limit capped to 500
+  - Screenshot strategy (4): web→sandbox, has images→readme_images, fallback→project_card, web priority over images
+  - Tool schema (2): has required fields, excludes screenshot_strategy
+  - Node integration (5): success, missing repo_context, API error, no tool_use block, web visual_type→sandbox strategy
+
+**Architecture:**
+- Anthropic client in `services/llm_client.py` — reusable singleton for Section 6 generate node
+- Token counting via char estimate (4 chars/token) — avoids tiktoken dependency
+- Screenshot strategy is deterministic code, not LLM — simple rules don't need LLM tokens
+- Secret redaction runs before LLM call — regex-based on README and config contents
+- Tool schema derived from Pydantic `model_json_schema()` — stays in sync automatically
+- Model: `claude-sonnet-4-20250514` — cost-effective for analysis
+
+**Test suite:** 54 total tests passing (21 new + 33 existing from Sections 1-3)
