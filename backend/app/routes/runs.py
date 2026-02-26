@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
 from app.database import get_session
-from app.graph import compiled_graph
+import app.graph
 from app.models import Run, RunStatus
 from app.routes.deps import get_or_create_user
 from app.schemas.runs import CreateRunRequest, RunDetailResponse, RunResponse
@@ -29,7 +29,7 @@ async def create_run(
     x_github_username: str = Header("unknown", alias="X-GitHub-Username"),
 ) -> RunResponse:
     """Create a new pipeline run for the given repository URL."""
-    if compiled_graph is None:
+    if app.graph.compiled_graph is None:
         raise HTTPException(503, "Pipeline not ready")
 
     user = await get_or_create_user(x_github_id, x_github_username, session)
@@ -105,14 +105,14 @@ async def regenerate_run(
 @router.get("/{run_id}/stream")
 async def stream_run(run_id: uuid.UUID) -> EventSourceResponse:
     """SSE stream of pipeline progress events for a run."""
-    if compiled_graph is None:
+    if app.graph.compiled_graph is None:
         raise HTTPException(503, "Pipeline not ready")
 
     config = {"configurable": {"thread_id": str(run_id)}}
 
     async def event_generator():
         try:
-            async for chunk in compiled_graph.astream(
+            async for chunk in app.graph.compiled_graph.astream(
                 None, config, stream_mode="custom"
             ):
                 yield {"event": "status", "data": str(chunk)}

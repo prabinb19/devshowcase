@@ -9,7 +9,7 @@ from typing import Any
 from sqlalchemy import select
 
 from app.database import async_session
-from app.graph import compiled_graph
+import app.graph
 from app.models import Run, RunStatus
 from app.nodes.generate import generate
 
@@ -20,7 +20,7 @@ async def execute_graph(
     run_id: uuid.UUID, user_id: uuid.UUID, repo_url: str
 ) -> None:
     """Execute the LangGraph pipeline for a run. Called via asyncio.create_task()."""
-    if compiled_graph is None:
+    if app.graph.compiled_graph is None:
         logger.error("Graph not initialized — cannot execute run %s", run_id)
         return
 
@@ -42,7 +42,7 @@ async def execute_graph(
     config = {"configurable": {"thread_id": str(run_id)}}
 
     try:
-        final_state = await compiled_graph.ainvoke(initial_state, config)
+        final_state = await app.graph.compiled_graph.ainvoke(initial_state, config)
 
         # Update run with results
         async with async_session() as session:

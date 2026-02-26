@@ -81,8 +81,6 @@ def mock_graph():
         patch("app.graph.init_graph", new_callable=AsyncMock),
         patch("app.graph.shutdown_graph", new_callable=AsyncMock),
         patch("app.graph.compiled_graph", mock),
-        patch("app.routes.runs.compiled_graph", mock),
-        patch("app.services.run_executor.compiled_graph", mock),
     ):
         yield mock
 

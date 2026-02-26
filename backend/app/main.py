@@ -1,5 +1,6 @@
 """FastAPI application entry point."""
 
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -11,10 +12,17 @@ from app.middleware.rate_limit import RateLimitMiddleware
 from app.routes.drafts import router as drafts_router
 from app.routes.runs import router as runs_router
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await init_graph(settings.checkpoint_url)
+    try:
+        await init_graph(settings.checkpoint_url)
+        logger.info("Pipeline initialized successfully")
+    except Exception as exc:
+        logger.error("Failed to initialize pipeline: %s", exc, exc_info=True)
     yield
     await shutdown_graph()
 

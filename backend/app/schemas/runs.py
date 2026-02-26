@@ -27,7 +27,7 @@ class RunDetailResponse(BaseModel):
     error: str | None = None
     repo_context: dict | None = None
     analysis: dict | None = None
-    screenshots: dict | None = None
+    screenshots: list[dict] | None = None
     post_draft: dict | None = None
     created_at: datetime
     updated_at: datetime
