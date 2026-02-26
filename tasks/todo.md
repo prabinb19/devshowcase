@@ -127,15 +127,15 @@
 ## Section 8: OAuth + Publishing (LinkedIn Only)
 
 - [ ] Apply for LinkedIn "Share on LinkedIn" developer product (manual step)
-- [ ] Implement LinkedIn OAuth2 flow in backend (`w_member_social` scope)
-- [ ] Store LinkedIn OAuth callback route and token exchange
-- [ ] Build encrypted token storage using Fernet (encryption key from env var `TOKEN_ENCRYPTION_KEY`)
-- [ ] Implement token refresh logic (60-day access token, 365-day refresh token)
-- [ ] Implement LinkedIn image upload — 2-step: `initializeUpload` → `PUT` binary to upload URL
-- [ ] Implement LinkedIn post creation via Posts API (v202502, `PUBLISHED` lifecycle state)
-- [ ] Implement LinkedIn first-comment auto-post (comment on own post with GitHub link)
-- [ ] Add retry logic with exponential backoff (max 3 retries, base 1s) for LinkedIn API calls
-- [ ] Build post history page (`/history`) — show published posts with timestamps and LinkedIn links
+- [x] Implement LinkedIn OAuth2 flow in backend (`w_member_social` scope)
+- [x] Store LinkedIn OAuth callback route and token exchange
+- [x] Build encrypted token storage using Fernet (encryption key from env var `TOKEN_ENCRYPTION_KEY`)
+- [x] Implement token refresh logic (60-day access token, 365-day refresh token)
+- [x] Implement LinkedIn image upload — 2-step: `initializeUpload` → `PUT` binary to upload URL
+- [x] Implement LinkedIn post creation via Posts API (v202502, `PUBLISHED` lifecycle state)
+- [x] Implement LinkedIn first-comment auto-post (comment on own post with GitHub link)
+- [x] Add retry logic with exponential backoff (max 3 retries, base 1s) for LinkedIn API calls
+- [x] Build post history page (`/history`) — show published posts with timestamps and LinkedIn links
 - [ ] End-to-end test: GitHub URL → pipeline → review → publish to LinkedIn
 
 ---
@@ -376,3 +376,58 @@
 - Frontend: `npx next build` succeeds — all 5 routes + auth handler compiled, no TS/ESLint errors
 
 **Test suite:** 111 total tests passing (14 new backend + 97 existing from Sections 1-6)
+
+### Section 8 Review (2026-02-26)
+
+**Backend changes (7 files created, 3 modified):**
+- `backend/app/services/token_encryption.py` — NEW: Fernet encrypt/decrypt with lazy singleton pattern (matches `r2_storage.py`)
+- `backend/app/schemas/linkedin.py` — NEW: `LinkedInAuthURLResponse`, `LinkedInCallbackRequest`, `LinkedInTokenStatus`, `PublishRequest`, `PublishResponse`
+- `backend/app/services/linkedin_client.py` — NEW: Full LinkedIn API client (~200 lines)
+  - `_request_with_retry()` — exponential backoff (max 3, base 1s) for 5xx/429
+  - `build_auth_url(state)` — OAuth URL with `w_member_social openid profile` scope
+  - `exchange_code_for_tokens(code)` — POST to token endpoint
+  - `refresh_access_token(refresh_token)` — refresh flow
+  - `get_linkedin_profile(access_token)` — GET `/v2/userinfo`, returns person URN
+  - `upload_image(access_token, author_urn, image_url)` — 2-step: `initializeUpload` then PUT binary
+  - `create_post(access_token, author_urn, body, image_urns)` — Posts API v202502, single/multi-image support
+  - `create_comment(access_token, post_urn, text)` — comment on own post
+  - All calls use `LinkedIn-Version: 202502` header and `httpx.AsyncClient`
+- `backend/app/routes/linkedin.py` — NEW: 5 endpoints
+  - `GET /api/linkedin/auth-url` — returns OAuth redirect URL
+  - `POST /api/linkedin/callback` — exchanges code for tokens, encrypts, upserts Token row
+  - `GET /api/linkedin/status` — checks valid LinkedIn token (auto-refreshes if expired)
+  - `POST /api/linkedin/publish` — upload images → create post → auto-comment → update draft status
+  - `DELETE /api/linkedin/disconnect` — removes stored tokens (204)
+- `backend/app/config.py` — added `linkedin_redirect_uri` setting
+- `backend/app/main.py` — registered linkedin router
+- `backend/app/routes/drafts.py` — added optional `status: DraftStatus | None` query filter to `list_drafts`
+- `backend/tests/test_linkedin.py` — NEW: 10 tests
+  - Token encryption round-trip, auth URL, callback stores token, status connected/not connected
+  - Publish success (mocked LinkedIn API), publish no token (401), publish draft not found (404)
+  - Retry logic (500 then 200), disconnect (204)
+
+**Frontend changes (2 files created, 5 modified):**
+- `frontend/src/app/api/linkedin/callback/route.ts` — NEW: Next.js API route catches LinkedIn OAuth redirect, forwards code to backend
+- `frontend/src/app/history/page.tsx` — NEW: Published posts page with card grid, SWR fetch with `status=published` filter
+- `frontend/src/types/index.ts` — added `LinkedInStatus`, `PublishResponse` interfaces
+- `frontend/src/lib/api.ts` — added `getLinkedInAuthUrl()`, `getLinkedInStatus()`, `publishToLinkedIn()`, `disconnectLinkedIn()`, `listDraftsByStatus()`
+- `frontend/src/app/runs/[id]/review/page.tsx` — added "Publish to LinkedIn" button with connection check flow (save draft → publish → redirect to /history)
+- `frontend/src/components/navbar.tsx` — added "History" nav link
+- `frontend/src/middleware.ts` — added `/history/:path*` to protected routes
+
+**Architecture:**
+- Token encryption uses `cryptography.Fernet` — same lazy singleton pattern as R2 client
+- LinkedIn API client is standalone in `services/linkedin_client.py` — routes are thin orchestrators
+- Auto-refresh: status and publish endpoints transparently refresh expired tokens
+- Frontend publish flow: checks connection → redirects to OAuth if needed → saves draft → publishes → redirects to history
+- History page reuses existing drafts API with new `status` filter parameter
+
+**Deferred items:**
+- LinkedIn developer product application (manual step)
+- End-to-end test (requires live LinkedIn credentials)
+
+**Verification:**
+- Backend: 10/10 new tests pass, 117/117 total tests pass
+- Frontend: `npx next build` succeeds — all routes compiled, no TS/ESLint errors
+
+**Test suite:** 117 total tests passing (10 new + 107 existing from Sections 1-7)
