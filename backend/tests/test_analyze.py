@@ -111,6 +111,11 @@ class TestDetermineScreenshotStrategy:
             _determine_screenshot_strategy("web", True, ["img.png"]) == "sandbox"
         )
 
+    def test_case_insensitive_visual_type(self) -> None:
+        assert _determine_screenshot_strategy("Web", False, []) == "sandbox"
+        assert _determine_screenshot_strategy("WEB", False, []) == "sandbox"
+        assert _determine_screenshot_strategy("CLI", False, ["img.png"]) == "readme_images"
+
 
 # ── Tool schema tests ──
 

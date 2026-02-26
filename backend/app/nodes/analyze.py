@@ -75,6 +75,7 @@ def _determine_screenshot_strategy(
     images_in_readme: list[str],
 ) -> str:
     """Deterministic screenshot strategy — no LLM needed."""
+    visual_type = visual_type.lower()
     if visual_type == "web":
         return "sandbox"
     if images_in_readme:
