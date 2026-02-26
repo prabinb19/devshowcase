@@ -63,14 +63,14 @@ async def execute_graph(
 
             await session.commit()
 
-    except Exception:
+    except Exception as exc:
         logger.exception("Unhandled error in run %s", run_id)
         async with async_session() as session:
             result = await session.execute(select(Run).where(Run.id == run_id))
             run = result.scalar_one_or_none()
             if run:
                 run.status = RunStatus.failed
-                run.error = "Internal pipeline error"
+                run.error = str(exc)[:500]
                 await session.commit()
 
 
@@ -108,12 +108,12 @@ async def execute_graph_from_generate(
 
             await session.commit()
 
-    except Exception:
+    except Exception as exc:
         logger.exception("Unhandled error in regenerate run %s", run_id)
         async with async_session() as session:
             db_result = await session.execute(select(Run).where(Run.id == run_id))
             run = db_result.scalar_one_or_none()
             if run:
                 run.status = RunStatus.failed
-                run.error = "Internal regeneration error"
+                run.error = str(exc)[:500]
                 await session.commit()

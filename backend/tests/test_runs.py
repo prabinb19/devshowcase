@@ -240,6 +240,32 @@ async def test_regenerate_run_not_found(client: AsyncClient):
     assert response.status_code == 404
 
 
+async def test_regenerate_incomplete_run_returns_409(
+    client: AsyncClient, sample_run: Run
+):
+    """POST /api/runs/{id}/regenerate returns 409 for a pending run."""
+    from app.main import app
+
+    result_mock = MagicMock()
+    result_mock.scalar_one_or_none.return_value = sample_run  # status=pending
+    session = _make_mock_session(execute_return=result_mock)
+
+    async def override_session():
+        yield session
+
+    app.dependency_overrides[get_session] = override_session
+    try:
+        response = await client.post(
+            f"/api/runs/{sample_run.id}/regenerate",
+            json={"feedback": "Make it better"},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 409
+    assert "completed or failed" in response.json()["detail"]
+
+
 async def test_rate_limit_returns_429(
     client: AsyncClient, github_id: str
 ):
@@ -265,7 +291,10 @@ async def test_rate_limit_returns_429(
         response = await client.post(
             "/api/runs",
             json={"repo_url": "https://github.com/test/repo"},
-            headers={"X-GitHub-Id": github_id},
+            headers={
+                "X-GitHub-Id": github_id,
+                "X-GitHub-Username": "testuser",
+            },
         )
 
     assert response.status_code == 429
