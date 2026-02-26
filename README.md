@@ -34,6 +34,19 @@ DevShowcase takes a public GitHub repository URL, analyzes the codebase using Cl
 3. **Capture** — Extracts README images or generates a branded project card (1200x630). Images are processed and uploaded to Cloudflare R2.
 4. **Generate** — Crafts a LinkedIn-optimized post with hook, body, alt texts, and first comment.
 
+## Features
+
+- **One-click post generation** — Paste a GitHub URL, get a LinkedIn-ready post in seconds
+- **AI-powered analysis** — Claude identifies project highlights, tech stack, and key features
+- **Smart screenshots** — Extracts README images or generates branded project cards
+- **Live pipeline tracking** — Real-time SSE progress updates as each stage completes
+- **Full post editor** — Edit body, first comment, select screenshots, update alt texts
+- **LinkedIn preview** — See exactly how your post will look before publishing
+- **Direct publishing** — OAuth-connected LinkedIn publishing with auto-first-comment
+- **Draft management** — Save, edit, and manage drafts before publishing
+- **User preferences** — Configure default tone (professional/casual/technical/enthusiastic) and hashtags
+- **Regeneration** — Provide feedback and regenerate posts without starting over
+
 ## Tech Stack
 
 **Backend:** Python 3.12, FastAPI, LangGraph, SQLAlchemy (async), Anthropic SDK, httpx, Pillow, Fernet encryption
@@ -67,7 +80,7 @@ docker compose up -d
 
 ```bash
 cd backend
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 cp .env.example .env
@@ -120,6 +133,10 @@ npm run dev
 cd backend
 .venv/bin/python -m pytest tests/ -v
 ```
+
+122 tests cover all pipeline nodes, API routes, and services — all use mocks, no API keys needed.
+
+For a detailed setup walkthrough with key generation steps, see [`tasks/local-setup.md`](tasks/local-setup.md).
 
 ## Deployment
 
