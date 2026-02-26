@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import useSWR from "swr";
@@ -35,6 +35,7 @@ export default function ReviewPage() {
   const [feedback, setFeedback] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Initialize state from run data once loaded
   const draft = run?.post_draft;
@@ -42,22 +43,14 @@ export default function ReviewPage() {
   const displayComment = firstComment ?? draft?.first_comment ?? "";
   const displayAltTexts = altTexts.length > 0 ? altTexts : draft?.alt_texts ?? [];
 
-  // Initialize selections on first load
-  if (draft && body === null) {
-    // Use setTimeout-free approach: set state will be picked up next render
-    // We use the ?? pattern above instead
-  }
-  if (draft && selectedScreenshots.size === 0 && draft.screenshot_urls.length > 0 && body === null) {
-    // Select all screenshots by default on first render
-    const allSelected = new Set(draft.screenshot_urls.map((_, i) => i));
-    if (allSelected.size > 0 && selectedScreenshots.size === 0) {
-      // This runs once effectively
-      setTimeout(() => {
-        setSelectedScreenshots(allSelected);
-        setAltTexts(draft.alt_texts ?? draft.screenshot_urls.map(() => ""));
-      }, 0);
+  // Initialize selections when draft data arrives
+  useEffect(() => {
+    if (!draft) return;
+    if (draft.screenshot_urls.length > 0) {
+      setSelectedScreenshots(new Set(draft.screenshot_urls.map((_, i) => i)));
+      setAltTexts(draft.alt_texts ?? draft.screenshot_urls.map(() => ""));
     }
-  }
+  }, [draft]);
 
   const charCount = displayBody.length;
 
@@ -90,6 +83,7 @@ export default function ReviewPage() {
     }
 
     setSaving(true);
+    setError(null);
     try {
       const selectedUrls = draft?.screenshot_urls.filter((_, i) => selectedScreenshots.has(i)) ?? [];
       const selectedAlts = displayAltTexts.filter((_, i) => selectedScreenshots.has(i));
@@ -104,6 +98,7 @@ export default function ReviewPage() {
       });
       router.push("/drafts");
     } catch {
+      setError("Failed to save draft. Please try again.");
       setSaving(false);
     }
   }
@@ -111,10 +106,12 @@ export default function ReviewPage() {
   async function handleRegenerate() {
     if (!feedback.trim()) return;
     setRegenerating(true);
+    setError(null);
     try {
       const data = await regenerateRun(id, feedback.trim());
       router.push(`/runs/${data.run_id}`);
     } catch {
+      setError("Failed to regenerate. Please try again.");
       setRegenerating(false);
     }
   }
@@ -216,8 +213,8 @@ export default function ReviewPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <Navbar />
-      <main className="mx-auto max-w-5xl px-4 py-8">
-        <div className="grid gap-8 lg:grid-cols-2">
+      <main className="mx-auto max-w-5xl px-4 py-6 sm:py-8">
+        <div className="grid gap-6 sm:gap-8 lg:grid-cols-2">
           {/* Left Column - Editor */}
           <div className="flex flex-col gap-6">
             <Card header={<h2 className="text-lg font-semibold text-gray-900 dark:text-white">Edit Post</h2>}>
@@ -262,9 +259,9 @@ export default function ReviewPage() {
                     <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                       Screenshots
                     </label>
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
                       {draft.screenshot_urls.map((url, idx) => (
-                        <div key={idx} className="flex flex-col gap-2 rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+                        <div key={idx} className="flex flex-col gap-2 rounded-lg border border-gray-200 p-2 sm:p-3 dark:border-gray-700">
                           <label className="flex items-center gap-2">
                             <input
                               type="checkbox"
@@ -348,8 +345,8 @@ export default function ReviewPage() {
         </div>
 
         {/* Action Buttons */}
-        <div className="mt-8 flex flex-col gap-3">
-          <div className="flex flex-wrap gap-3">
+        <div className="mt-6 flex flex-col gap-3 sm:mt-8">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-3">
             <Button loading={publishing} onClick={handlePublish}>
               Publish to LinkedIn
             </Button>
@@ -363,8 +360,8 @@ export default function ReviewPage() {
               Discard
             </Button>
           </div>
-          {publishError && (
-            <p className="text-sm text-red-600">{publishError}</p>
+          {(error || publishError) && (
+            <p className="text-sm text-red-600">{error || publishError}</p>
           )}
         </div>
 

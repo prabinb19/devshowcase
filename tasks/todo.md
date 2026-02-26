@@ -431,3 +431,29 @@
 - Frontend: `npx next build` succeeds — all routes compiled, no TS/ESLint errors
 
 **Test suite:** 117 total tests passing (10 new + 107 existing from Sections 1-7)
+
+### Section 9 Quality Fixes Review (2026-02-26)
+
+**Critical fixes (2):**
+- `review/page.tsx` — Replaced `setTimeout` setState anti-pattern with `useEffect` keyed on `[draft]` for initializing screenshots/altTexts. Removed dead empty `if` block.
+- `settings/page.tsx` — Added try/catch error handling to `handleSave`, `handleConnectLinkedIn`, `handleDisconnectLinkedIn` with user-facing error display.
+
+**High fixes (4):**
+- `review/page.tsx` — Added `error` state with user-facing messages in `handleSaveDraft` and `handleRegenerate` catch blocks, displayed in UI.
+- `backend/Dockerfile` — Pinned base image to `python:3.12.12-slim`, added non-root `appuser` (security hardening).
+- `backend/.dockerignore` — NEW: excludes `.git`, `__pycache__`, `.env`, `tests/`, `*.pyc`, `.venv`.
+- `backend/tests/test_settings.py` — NEW: 5 tests (GET defaults, GET stored, PUT update, PUT invalid tone 422, missing auth 422).
+
+**Medium fixes (3):**
+- `backend/app/schemas/settings.py` — Constrained `default_tone` to `Literal["professional", "casual", "technical", "enthusiastic"]`, added `max_length=30` on hashtags list, removed unused `from_attributes`.
+- `frontend/src/types/index.ts` — Added `ToneOption` union type, applied to `UserSettings.default_tone`.
+- `settings/page.tsx` — Added duplicate hashtag prevention in `addHashtag()`, typed tone state as `ToneOption`.
+
+**Files modified (5):** `review/page.tsx`, `settings/page.tsx`, `types/index.ts`, `schemas/settings.py`, `Dockerfile`
+**Files created (2):** `backend/.dockerignore`, `backend/tests/test_settings.py`
+
+**Verification:**
+- Backend: 122/122 tests pass (5 new settings tests + 117 existing)
+- Frontend: `npx next build` succeeds — no TS/ESLint errors
+
+**Test suite:** 122 total tests passing (5 new + 117 existing from Sections 1-8)

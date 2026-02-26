@@ -129,3 +129,28 @@ export function listDraftsByStatus(userId: string, status: string) {
     `/api/drafts?user_id=${userId}&status=${status}`
   );
 }
+
+// Settings
+export function getUserSettings(githubId: string, githubUsername: string) {
+  return apiFetch<import("@/types").UserSettings>("/api/settings", {
+    headers: {
+      "X-GitHub-Id": githubId,
+      "X-GitHub-Username": githubUsername,
+    },
+  });
+}
+
+export function updateUserSettings(
+  githubId: string,
+  githubUsername: string,
+  data: import("@/types").UserSettings
+) {
+  return apiFetch<import("@/types").UserSettings>("/api/settings", {
+    method: "PUT",
+    headers: {
+      "X-GitHub-Id": githubId,
+      "X-GitHub-Username": githubUsername,
+    },
+    body: JSON.stringify(data),
+  });
+}

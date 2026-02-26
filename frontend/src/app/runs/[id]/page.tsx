@@ -112,9 +112,18 @@ export default function RunStatusPage() {
           )}
 
           {isFailed && (
-            <p className="mt-4 text-sm text-red-600">
-              {run?.error ?? "Pipeline failed. Please try again."}
-            </p>
+            <div className="mt-4">
+              <p className="text-sm text-red-600">
+                {run?.error ?? "Pipeline failed. Please try again."}
+              </p>
+              <Button
+                variant="secondary"
+                className="mt-3"
+                onClick={() => router.push("/dashboard")}
+              >
+                Try Another Repo
+              </Button>
+            </div>
           )}
 
           {isCompleted && (

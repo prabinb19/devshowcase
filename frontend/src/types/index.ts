@@ -89,3 +89,10 @@ export interface PublishResponse {
   post_url: string | null;
   error: string | null;
 }
+
+export type ToneOption = "professional" | "casual" | "technical" | "enthusiastic";
+
+export interface UserSettings {
+  default_tone: ToneOption;
+  hashtags: string[];
+}

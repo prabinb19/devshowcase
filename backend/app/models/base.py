@@ -36,6 +36,7 @@ class User(Base):
     github_id: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     github_username: Mapped[str] = mapped_column(String, nullable=False)
     email: Mapped[str | None] = mapped_column(String, nullable=True)
+    preferences: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

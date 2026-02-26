@@ -12,6 +12,7 @@ from app.middleware.rate_limit import RateLimitMiddleware
 from app.routes.drafts import router as drafts_router
 from app.routes.linkedin import router as linkedin_router
 from app.routes.runs import router as runs_router
+from app.routes.settings import router as settings_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -42,6 +43,7 @@ app.add_middleware(RateLimitMiddleware)
 app.include_router(runs_router, prefix="/api")
 app.include_router(drafts_router, prefix="/api")
 app.include_router(linkedin_router, prefix="/api")
+app.include_router(settings_router, prefix="/api")
 
 
 @app.get("/health")
