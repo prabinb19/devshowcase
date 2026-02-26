@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     linkedin_redirect_uri: str = "http://localhost:3000/api/linkedin/callback"
     checkpoint_url: str = "postgresql://postgres:dev@localhost:5432/devshowcase"
     rate_limit_runs_per_hour: int = 10
+    cors_origins: list[str] = ["http://localhost:3000"]
+    db_pool_size: int = 5
+    db_max_overflow: int = 10
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

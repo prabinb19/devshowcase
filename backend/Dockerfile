@@ -8,9 +8,13 @@ RUN apt-get update && \
     libjpeg-dev libpng-dev libfreetype6-dev gcc && \
     rm -rf /var/lib/apt/lists/*
 
+# Install dependencies first (cached layer unless pyproject.toml changes)
 COPY pyproject.toml ./
-RUN pip install --no-cache-dir .
+RUN mkdir -p app && touch app/__init__.py && \
+    pip install --no-cache-dir . && \
+    rm -rf app
 
+# Copy application source
 COPY . .
 
 RUN useradd --create-home appuser

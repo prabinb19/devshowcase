@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import User
@@ -10,7 +11,11 @@ from app.models import User
 async def get_or_create_user(
     github_id: str, github_username: str, session: AsyncSession
 ) -> User:
-    """Look up User by github_id, create if not found, return User record."""
+    """Look up User by github_id, create if not found, return User record.
+
+    Handles the race condition where two concurrent requests for the same
+    github_id both pass the SELECT and attempt INSERT.
+    """
     result = await session.execute(
         select(User).where(User.github_id == github_id)
     )
@@ -19,6 +24,14 @@ async def get_or_create_user(
         return user
     user = User(github_id=github_id, github_username=github_username)
     session.add(user)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        result = await session.execute(
+            select(User).where(User.github_id == github_id)
+        )
+        user = result.scalar_one()
+        return user
     await session.refresh(user)
     return user

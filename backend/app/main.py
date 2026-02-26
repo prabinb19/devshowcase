@@ -18,10 +18,15 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+_pipeline_healthy = False
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global _pipeline_healthy  # noqa: PLW0603
     try:
         await init_graph(settings.checkpoint_url)
+        _pipeline_healthy = True
         logger.info("Pipeline initialized successfully")
     except Exception as exc:
         logger.error("Failed to initialize pipeline: %s", exc, exc_info=True)
@@ -33,7 +38,7 @@ app = FastAPI(title="DevShowcase API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -48,4 +53,5 @@ app.include_router(settings_router, prefix="/api")
 
 @app.get("/health")
 async def health() -> dict[str, str]:
-    return {"status": "ok"}
+    status = "ok" if _pipeline_healthy else "degraded"
+    return {"status": status}
