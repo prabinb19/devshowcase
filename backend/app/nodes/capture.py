@@ -68,7 +68,22 @@ async def capture(state: AgentState) -> dict[str, Any]:
                 screenshots = generate_project_card(**card_kwargs)
 
         elif strategy == "sandbox":
-            screenshots = capture_sandbox_screenshot(**card_kwargs)
+            def _emit_stream_url(url: str) -> None:
+                writer({"stage": "capturing", "message": "Live sandbox preview available", "stream_url": url})
+
+            sandbox_kwargs = {
+                **card_kwargs,
+                "repo_url": repo_context.get("url", ""),
+                "run_command": analysis.get("run_command", ""),
+                "install_command": analysis.get("install_command", ""),
+                "expected_port": analysis.get("expected_port"),
+                "on_stream_url": _emit_stream_url,
+            }
+            screenshots = capture_sandbox_screenshot(**sandbox_kwargs)
+            writer({"stage": "capturing", "message": "Screenshot captured", "stream_url": None})
+            if not screenshots:
+                logger.info("Sandbox capture returned no screenshots, falling back to project card")
+                screenshots = generate_project_card(**card_kwargs)
 
         else:  # "project_card" or any default
             screenshots = generate_project_card(**card_kwargs)

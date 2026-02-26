@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     github_token: str = ""
     e2b_api_key: str = ""
+    e2b_template_id: str = ""  # Custom template name/ID; empty = default desktop
     token_encryption_key: str = ""
     r2_account_id: str = ""
     r2_access_key_id: str = ""

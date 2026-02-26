@@ -29,6 +29,7 @@ export function useSSE(url: string | null) {
   const [events, setEvents] = useState<SSEEvent[]>([]);
   const [isDone, setIsDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const sourceRef = useRef<EventSource | null>(null);
 
   const reset = useCallback(() => {
@@ -47,6 +48,9 @@ export function useSSE(url: string | null) {
       try {
         const data = JSON.parse(e.data);
         setEvents((prev) => [...prev, data]);
+        if ("stream_url" in data) {
+          setStreamUrl(data.stream_url ?? null);
+        }
       } catch {
         // non-JSON status — treat as string
         setEvents((prev) => [...prev, { stage: "info", message: e.data }]);
@@ -55,12 +59,14 @@ export function useSSE(url: string | null) {
 
     es.addEventListener("done", () => {
       setIsDone(true);
+      setStreamUrl(null);
       es.close();
     });
 
     es.addEventListener("error", () => {
       if (es.readyState === EventSource.CLOSED) return;
       setError("Connection lost");
+      setStreamUrl(null);
       es.close();
     });
 
@@ -75,5 +81,5 @@ export function useSSE(url: string | null) {
     };
   }, [url]);
 
-  return { events, isDone, error, reset };
+  return { events, isDone, error, streamUrl, reset };
 }

@@ -333,27 +333,368 @@ class TestGenerateProjectCard:
 
 
 # ══════════════════════════════════════════════════════════════
-#  Sandbox (MVP stub)
+#  Sandbox (E2B Desktop)
 # ══════════════════════════════════════════════════════════════
+
+_SANDBOX_CARD_KWARGS = {
+    "name": "WebApp",
+    "description": "A web app",
+    "tech_stack": ["React"],
+    "stars": 50,
+    "language": "TypeScript",
+    "key_features": ["SPA"],
+    "run_id": "run-1",
+}
+
+_SANDBOX_FULL_KWARGS = {
+    **_SANDBOX_CARD_KWARGS,
+    "repo_url": "https://github.com/owner/repo",
+    "run_command": "npm start",
+    "install_command": "npm install",
+    "expected_port": 3000,
+}
 
 
 class TestCaptureSandboxScreenshot:
     @patch("app.services.screenshot.sandbox.generate_project_card")
-    def test_falls_back_to_project_card(self, mock_card: MagicMock) -> None:
+    def test_missing_repo_url_falls_back(self, mock_card: MagicMock) -> None:
+        mock_card.return_value = [{"url": "https://r2/card.png", "source": "project_card"}]
+        result = capture_sandbox_screenshot(**{**_SANDBOX_FULL_KWARGS, "repo_url": ""})
+        mock_card.assert_called_once()
+        assert result[0]["source"] == "project_card"
+
+    @patch("app.services.screenshot.sandbox.generate_project_card")
+    def test_missing_run_command_falls_back(self, mock_card: MagicMock) -> None:
+        mock_card.return_value = [{"url": "https://r2/card.png", "source": "project_card"}]
+        result = capture_sandbox_screenshot(**{**_SANDBOX_FULL_KWARGS, "run_command": ""})
+        mock_card.assert_called_once()
+        assert result[0]["source"] == "project_card"
+
+    @patch("app.services.screenshot.sandbox.generate_project_card")
+    def test_missing_expected_port_falls_back(self, mock_card: MagicMock) -> None:
+        mock_card.return_value = [{"url": "https://r2/card.png", "source": "project_card"}]
+        result = capture_sandbox_screenshot(**{**_SANDBOX_FULL_KWARGS, "expected_port": None})
+        mock_card.assert_called_once()
+        assert result[0]["source"] == "project_card"
+
+    @patch("app.services.screenshot.sandbox.settings")
+    @patch("app.services.screenshot.sandbox.generate_project_card")
+    def test_missing_api_key_falls_back(self, mock_card: MagicMock, mock_settings: MagicMock) -> None:
+        mock_settings.e2b_api_key = ""
+        mock_settings.github_token = ""
+        mock_card.return_value = [{"url": "https://r2/card.png", "source": "project_card"}]
+        result = capture_sandbox_screenshot(**_SANDBOX_FULL_KWARGS)
+        mock_card.assert_called_once()
+        assert result[0]["source"] == "project_card"
+
+    @patch("app.services.screenshot.sandbox.settings")
+    @patch("app.services.screenshot.sandbox.generate_project_card")
+    def test_import_error_falls_back(self, mock_card: MagicMock, mock_settings: MagicMock) -> None:
+        mock_settings.e2b_api_key = "test-key"
+        mock_settings.github_token = ""
         mock_card.return_value = [{"url": "https://r2/card.png", "source": "project_card"}]
 
-        result = capture_sandbox_screenshot(
-            name="WebApp",
-            description="A web app",
-            tech_stack=["React"],
-            stars=50,
-            language="TypeScript",
-            key_features=["SPA"],
-            run_id="run-1",
-        )
+        import builtins
+        real_import = builtins.__import__
+
+        def mock_import(name: str, *args: object, **kwargs: object) -> object:
+            if name == "e2b_desktop":
+                raise ImportError("No module named 'e2b_desktop'")
+            return real_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=mock_import):
+            result = capture_sandbox_screenshot(**_SANDBOX_FULL_KWARGS)
 
         mock_card.assert_called_once()
         assert result[0]["source"] == "project_card"
+
+    @patch("app.services.screenshot.sandbox.settings")
+    @patch("app.services.screenshot.sandbox.upload_image")
+    @patch("app.services.screenshot.sandbox.generate_project_card")
+    def test_happy_path(
+        self, mock_card: MagicMock, mock_upload: MagicMock, mock_settings: MagicMock,
+    ) -> None:
+        mock_settings.e2b_api_key = "test-key"
+        mock_settings.github_token = ""
+        mock_upload.return_value = "https://r2.dev/sandbox.png"
+
+        png_bytes = _make_png(1280, 800)
+
+        mock_commands = MagicMock()
+        mock_commands.run.return_value = MagicMock(exit_code=0, stdout="200", stderr="")
+
+        mock_desktop = MagicMock()
+        mock_desktop.commands = mock_commands
+        mock_desktop.screenshot.return_value = png_bytes
+
+        mock_sandbox_cls = MagicMock()
+        mock_sandbox_cls.create.return_value = mock_desktop
+
+        with patch.dict("sys.modules", {"e2b_desktop": MagicMock(Sandbox=mock_sandbox_cls)}):
+            result = capture_sandbox_screenshot(**_SANDBOX_FULL_KWARGS)
+
+        assert len(result) == 1
+        assert result[0]["source"] == "sandbox"
+        assert result[0]["url"] == "https://r2.dev/sandbox.png"
+        assert result[0]["width"] > 0
+        assert result[0]["height"] > 0
+        mock_card.assert_not_called()
+        mock_desktop.kill.assert_called_once()
+
+    @patch("app.services.screenshot.sandbox.settings")
+    @patch("app.services.screenshot.sandbox.generate_project_card")
+    def test_sandbox_exception_falls_back(self, mock_card: MagicMock, mock_settings: MagicMock) -> None:
+        mock_settings.e2b_api_key = "test-key"
+        mock_settings.github_token = ""
+        mock_card.return_value = [{"url": "https://r2/card.png", "source": "project_card"}]
+
+        mock_sandbox_cls = MagicMock()
+        mock_sandbox_cls.create.side_effect = RuntimeError("Sandbox creation failed")
+
+        with patch.dict("sys.modules", {"e2b_desktop": MagicMock(Sandbox=mock_sandbox_cls)}):
+            result = capture_sandbox_screenshot(**_SANDBOX_FULL_KWARGS)
+
+        mock_card.assert_called_once()
+        assert result[0]["source"] == "project_card"
+
+    @patch("app.services.screenshot.sandbox.time")
+    @patch("app.services.screenshot.sandbox.settings")
+    @patch("app.services.screenshot.sandbox.generate_project_card")
+    def test_port_never_ready_falls_back(
+        self, mock_card: MagicMock, mock_settings: MagicMock, mock_time: MagicMock,
+    ) -> None:
+        mock_settings.e2b_api_key = "test-key"
+        mock_settings.github_token = ""
+        mock_card.return_value = [{"url": "https://r2/card.png", "source": "project_card"}]
+        mock_time.sleep = MagicMock()
+
+        # Clone/install succeed, but curl always returns 000 (port not ready)
+        clone_result = MagicMock(exit_code=0, stderr="")
+        install_result = MagicMock(exit_code=0, stderr="")
+        curl_result = MagicMock(exit_code=1, stdout="000", stderr="")
+
+        mock_commands = MagicMock()
+        mock_commands.run.side_effect = [clone_result, install_result, MagicMock()] + [curl_result] * 25
+
+        mock_desktop = MagicMock()
+        mock_desktop.commands = mock_commands
+
+        mock_sandbox_cls = MagicMock()
+        mock_sandbox_cls.create.return_value = mock_desktop
+
+        with patch.dict("sys.modules", {"e2b_desktop": MagicMock(Sandbox=mock_sandbox_cls)}):
+            result = capture_sandbox_screenshot(**_SANDBOX_FULL_KWARGS)
+
+        mock_card.assert_called_once()
+        assert result[0]["source"] == "project_card"
+        mock_desktop.kill.assert_called_once()
+
+    @patch("app.services.screenshot.sandbox.settings")
+    @patch("app.services.screenshot.sandbox.upload_image")
+    @patch("app.services.screenshot.sandbox.generate_project_card")
+    def test_stream_callback_invoked(
+        self, mock_card: MagicMock, mock_upload: MagicMock, mock_settings: MagicMock,
+    ) -> None:
+        """Verify on_stream_url callback is called with the stream URL."""
+        mock_settings.e2b_api_key = "test-key"
+        mock_settings.github_token = ""
+        mock_upload.return_value = "https://r2.dev/sandbox.png"
+        png_bytes = _make_png(1280, 800)
+
+        mock_stream = MagicMock()
+        mock_stream.get_auth_key.return_value = "auth-key-123"
+        mock_stream.get_url.return_value = "https://e2b.dev/stream?auth=auth-key-123"
+
+        mock_commands = MagicMock()
+        mock_commands.run.return_value = MagicMock(exit_code=0, stdout="200", stderr="")
+
+        mock_desktop = MagicMock()
+        mock_desktop.commands = mock_commands
+        mock_desktop.stream = mock_stream
+        mock_desktop.screenshot.return_value = png_bytes
+
+        mock_sandbox_cls = MagicMock()
+        mock_sandbox_cls.create.return_value = mock_desktop
+
+        callback = MagicMock()
+
+        with patch.dict("sys.modules", {"e2b_desktop": MagicMock(Sandbox=mock_sandbox_cls)}):
+            result = capture_sandbox_screenshot(**_SANDBOX_FULL_KWARGS, on_stream_url=callback)
+
+        callback.assert_called_once_with("https://e2b.dev/stream?auth=auth-key-123")
+        mock_stream.start.assert_called_once_with(require_auth=True)
+        assert result[0]["source"] == "sandbox"
+
+    @patch("app.services.screenshot.sandbox.settings")
+    @patch("app.services.screenshot.sandbox.upload_image")
+    @patch("app.services.screenshot.sandbox.generate_project_card")
+    def test_stream_failure_nonfatal(
+        self, mock_card: MagicMock, mock_upload: MagicMock, mock_settings: MagicMock,
+    ) -> None:
+        """Verify stream failure doesn't prevent screenshot capture."""
+        mock_settings.e2b_api_key = "test-key"
+        mock_settings.github_token = ""
+        mock_upload.return_value = "https://r2.dev/sandbox.png"
+        png_bytes = _make_png(1280, 800)
+
+        mock_stream = MagicMock()
+        mock_stream.start.side_effect = RuntimeError("Stream failed")
+
+        mock_commands = MagicMock()
+        mock_commands.run.return_value = MagicMock(exit_code=0, stdout="200", stderr="")
+
+        mock_desktop = MagicMock()
+        mock_desktop.commands = mock_commands
+        mock_desktop.stream = mock_stream
+        mock_desktop.screenshot.return_value = png_bytes
+
+        mock_sandbox_cls = MagicMock()
+        mock_sandbox_cls.create.return_value = mock_desktop
+
+        callback = MagicMock()
+
+        with patch.dict("sys.modules", {"e2b_desktop": MagicMock(Sandbox=mock_sandbox_cls)}):
+            result = capture_sandbox_screenshot(**_SANDBOX_FULL_KWARGS, on_stream_url=callback)
+
+        callback.assert_not_called()
+        assert len(result) == 1
+        assert result[0]["source"] == "sandbox"
+
+    @patch("app.services.screenshot.sandbox.settings")
+    @patch("app.services.screenshot.sandbox.upload_image")
+    @patch("app.services.screenshot.sandbox.generate_project_card")
+    def test_no_callback_skips_streaming(
+        self, mock_card: MagicMock, mock_upload: MagicMock, mock_settings: MagicMock,
+    ) -> None:
+        """Verify stream.start() is never called when on_stream_url is None."""
+        mock_settings.e2b_api_key = "test-key"
+        mock_settings.github_token = ""
+        mock_upload.return_value = "https://r2.dev/sandbox.png"
+        png_bytes = _make_png(1280, 800)
+
+        mock_stream = MagicMock()
+
+        mock_commands = MagicMock()
+        mock_commands.run.return_value = MagicMock(exit_code=0, stdout="200", stderr="")
+
+        mock_desktop = MagicMock()
+        mock_desktop.commands = mock_commands
+        mock_desktop.stream = mock_stream
+        mock_desktop.screenshot.return_value = png_bytes
+
+        mock_sandbox_cls = MagicMock()
+        mock_sandbox_cls.create.return_value = mock_desktop
+
+        with patch.dict("sys.modules", {"e2b_desktop": MagicMock(Sandbox=mock_sandbox_cls)}):
+            result = capture_sandbox_screenshot(**_SANDBOX_FULL_KWARGS)
+
+        mock_stream.start.assert_not_called()
+        assert result[0]["source"] == "sandbox"
+
+    @patch("app.services.screenshot.sandbox.settings")
+    @patch("app.services.screenshot.sandbox.upload_image")
+    @patch("app.services.screenshot.sandbox.generate_project_card")
+    def test_custom_template_passed_to_sandbox(
+        self, mock_card: MagicMock, mock_upload: MagicMock, mock_settings: MagicMock,
+    ) -> None:
+        """Verify Sandbox.create() receives template when e2b_template_id is set."""
+        mock_settings.e2b_api_key = "test-key"
+        mock_settings.e2b_template_id = "custom-tpl"
+        mock_settings.github_token = ""
+        mock_upload.return_value = "https://r2.dev/sandbox.png"
+        png_bytes = _make_png(1280, 800)
+
+        mock_commands = MagicMock()
+        mock_commands.run.return_value = MagicMock(exit_code=0, stdout="200", stderr="")
+
+        mock_desktop = MagicMock()
+        mock_desktop.commands = mock_commands
+        mock_desktop.screenshot.return_value = png_bytes
+
+        mock_sandbox_cls = MagicMock()
+        mock_sandbox_cls.create.return_value = mock_desktop
+
+        with patch.dict("sys.modules", {"e2b_desktop": MagicMock(Sandbox=mock_sandbox_cls)}):
+            capture_sandbox_screenshot(**_SANDBOX_FULL_KWARGS)
+
+        call_kwargs = mock_sandbox_cls.create.call_args[1]
+        assert call_kwargs["template"] == "custom-tpl"
+
+    @patch("app.services.screenshot.sandbox.settings")
+    @patch("app.services.screenshot.sandbox.upload_image")
+    @patch("app.services.screenshot.sandbox.generate_project_card")
+    def test_no_template_uses_default(
+        self, mock_card: MagicMock, mock_upload: MagicMock, mock_settings: MagicMock,
+    ) -> None:
+        """Verify Sandbox.create() has no template key when e2b_template_id is empty."""
+        mock_settings.e2b_api_key = "test-key"
+        mock_settings.e2b_template_id = ""
+        mock_settings.github_token = ""
+        mock_upload.return_value = "https://r2.dev/sandbox.png"
+        png_bytes = _make_png(1280, 800)
+
+        mock_commands = MagicMock()
+        mock_commands.run.return_value = MagicMock(exit_code=0, stdout="200", stderr="")
+
+        mock_desktop = MagicMock()
+        mock_desktop.commands = mock_commands
+        mock_desktop.screenshot.return_value = png_bytes
+
+        mock_sandbox_cls = MagicMock()
+        mock_sandbox_cls.create.return_value = mock_desktop
+
+        with patch.dict("sys.modules", {"e2b_desktop": MagicMock(Sandbox=mock_sandbox_cls)}):
+            capture_sandbox_screenshot(**_SANDBOX_FULL_KWARGS)
+
+        call_kwargs = mock_sandbox_cls.create.call_args[1]
+        assert "template" not in call_kwargs
+
+    @patch("app.services.screenshot.sandbox.settings")
+    @patch("app.services.screenshot.sandbox.upload_image")
+    @patch("app.services.screenshot.sandbox.generate_project_card")
+    def test_env_vars_passed_to_sandbox(
+        self, mock_card: MagicMock, mock_upload: MagicMock, mock_settings: MagicMock,
+    ) -> None:
+        """Verify envs dict is passed to Sandbox.create()."""
+        mock_settings.e2b_api_key = "test-key"
+        mock_settings.e2b_template_id = ""
+        mock_settings.github_token = ""
+        mock_upload.return_value = "https://r2.dev/sandbox.png"
+        png_bytes = _make_png(1280, 800)
+
+        mock_commands = MagicMock()
+        mock_commands.run.return_value = MagicMock(exit_code=0, stdout="200", stderr="")
+
+        mock_desktop = MagicMock()
+        mock_desktop.commands = mock_commands
+        mock_desktop.screenshot.return_value = png_bytes
+
+        mock_sandbox_cls = MagicMock()
+        mock_sandbox_cls.create.return_value = mock_desktop
+
+        with patch.dict("sys.modules", {"e2b_desktop": MagicMock(Sandbox=mock_sandbox_cls)}):
+            capture_sandbox_screenshot(**_SANDBOX_FULL_KWARGS)
+
+        call_kwargs = mock_sandbox_cls.create.call_args[1]
+        assert call_kwargs["envs"] == {"CI": "true", "BROWSER": "none"}
+
+    @patch("app.services.screenshot.sandbox.settings")
+    @patch("app.services.screenshot.sandbox.generate_project_card")
+    def test_cleanup_called_on_exception(self, mock_card: MagicMock, mock_settings: MagicMock) -> None:
+        mock_settings.e2b_api_key = "test-key"
+        mock_settings.github_token = ""
+        mock_card.return_value = [{"url": "https://r2/card.png", "source": "project_card"}]
+
+        mock_desktop = MagicMock()
+        mock_desktop.commands.run.side_effect = RuntimeError("Clone exploded")
+
+        mock_sandbox_cls = MagicMock()
+        mock_sandbox_cls.create.return_value = mock_desktop
+
+        with patch.dict("sys.modules", {"e2b_desktop": MagicMock(Sandbox=mock_sandbox_cls)}):
+            capture_sandbox_screenshot(**_SANDBOX_FULL_KWARGS)
+
+        mock_desktop.kill.assert_called_once()
 
 
 # ══════════════════════════════════════════════════════════════
@@ -402,6 +743,35 @@ class TestCaptureNode:
 
         assert "error" not in result
         mock_sandbox.assert_called_once()
+        # Verify sandbox kwargs are forwarded from analysis/repo_context
+        call_kwargs = mock_sandbox.call_args[1]
+        assert call_kwargs["repo_url"] == "https://github.com/owner/myrepo"
+        assert call_kwargs["run_command"] == "npm start"
+        assert call_kwargs["install_command"] == "npm install"
+        assert call_kwargs["expected_port"] == 3000
+
+    async def test_sandbox_fallback_to_card(self) -> None:
+        with (
+            patch("app.nodes.capture.get_stream_writer") as mock_writer,
+            patch("app.nodes.capture.capture_sandbox_screenshot") as mock_sandbox,
+            patch("app.nodes.capture.generate_project_card") as mock_card,
+        ):
+            mock_writer.return_value = lambda x: None
+            mock_sandbox.return_value = []  # Empty = sandbox failed
+            mock_card.return_value = [
+                {"url": "https://r2/card.png", "source": "project_card", "width": 1200, "height": 630}
+            ]
+
+            state = {
+                "analysis": _sample_analysis("sandbox"),
+                "repo_context": _sample_repo_context(),
+                "run_id": "run-1",
+            }
+            result = await capture(state)
+
+        assert "error" not in result
+        assert result["screenshots"][0]["source"] == "project_card"
+        mock_card.assert_called_once()
 
     async def test_routes_to_readme_images(self) -> None:
         with (
@@ -444,6 +814,42 @@ class TestCaptureNode:
 
         assert "error" not in result
         assert result["screenshots"][0]["source"] == "project_card"
+
+    async def test_capture_node_emits_stream_url(self) -> None:
+        """Verify capture node emits stream_url via writer when sandbox callback is invoked."""
+        written: list[dict] = []
+
+        def fake_writer(data: dict) -> None:
+            written.append(data)
+
+        def fake_sandbox(**kwargs: object) -> list[dict]:
+            # Simulate the sandbox invoking the callback
+            cb = kwargs.get("on_stream_url")
+            if cb:
+                cb("https://e2b.dev/stream?auth=xyz")
+            return [{"url": "https://r2/sandbox.png", "source": "sandbox", "width": 1280, "height": 800}]
+
+        with (
+            patch("app.nodes.capture.get_stream_writer") as mock_writer,
+            patch("app.nodes.capture.capture_sandbox_screenshot", side_effect=fake_sandbox) as mock_sandbox,
+        ):
+            mock_writer.return_value = fake_writer
+
+            state = {
+                "analysis": _sample_analysis("sandbox"),
+                "repo_context": _sample_repo_context(),
+                "run_id": "run-1",
+            }
+            result = await capture(state)
+
+        assert "error" not in result
+        # Check that stream_url was emitted
+        stream_events = [w for w in written if w.get("stream_url") is not None]
+        assert len(stream_events) >= 1
+        assert stream_events[0]["stream_url"] == "https://e2b.dev/stream?auth=xyz"
+        # Check that stream_url=None was emitted to signal teardown
+        teardown_events = [w for w in written if "stream_url" in w and w["stream_url"] is None]
+        assert len(teardown_events) >= 1
 
     async def test_missing_analysis_returns_error(self) -> None:
         with patch("app.nodes.capture.get_stream_writer") as mock_writer:

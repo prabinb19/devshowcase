@@ -52,7 +52,7 @@ export default function RunStatusPage() {
   const router = useRouter();
   const id = params.id as string;
 
-  const { events, isDone, error: sseError } = useSSE(getSSEUrl(id));
+  const { events, isDone, error: sseError, streamUrl } = useSSE(getSSEUrl(id));
   const { data: run } = useSWR(`/run/${id}`, () => getRun(id), {
     refreshInterval: 3000,
   });
@@ -68,72 +68,105 @@ export default function RunStatusPage() {
     latestMessages[evt.stage] = evt.message;
   }
 
+  const pipelineStepper = (
+    <Card header={<h2 className="text-lg font-semibold text-gray-900 dark:text-white">Pipeline Status</h2>}>
+      <div className="flex flex-col gap-0">
+        {STAGES.map((stage, idx) => {
+          let state: "pending" | "active" | "completed" | "failed" = "pending";
+          if (isFailed && idx === activeIdx) {
+            state = "failed";
+          } else if (idx < activeIdx || isCompleted) {
+            state = "completed";
+          } else if (idx === activeIdx && !isFailed) {
+            state = "active";
+          }
+
+          return (
+            <div key={stage.key}>
+              <div className="flex items-center gap-3 py-2">
+                <StepIcon state={state} />
+                <div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {stage.label}
+                  </p>
+                  {latestMessages[stage.key] && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {latestMessages[stage.key]}
+                    </p>
+                  )}
+                </div>
+              </div>
+              {idx < STAGES.length - 1 && (
+                <div className="ml-[11px] h-4 w-0.5 bg-gray-200 dark:bg-gray-700" />
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {sseError && (
+        <p className="mt-4 text-sm text-yellow-600">{sseError} (using polling fallback)</p>
+      )}
+
+      {isFailed && (
+        <div className="mt-4">
+          <p className="text-sm text-red-600">
+            {run?.error ?? "Pipeline failed. Please try again."}
+          </p>
+          <Button
+            variant="secondary"
+            className="mt-3"
+            onClick={() => router.push("/dashboard")}
+          >
+            Try Another Repo
+          </Button>
+        </div>
+      )}
+
+      {isCompleted && (
+        <div className="mt-6">
+          <Button onClick={() => router.push(`/runs/${id}/review`)}>
+            Review Results
+          </Button>
+        </div>
+      )}
+    </Card>
+  );
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <Navbar />
-      <main className="mx-auto max-w-xl px-4 py-12">
-        <Card header={<h2 className="text-lg font-semibold text-gray-900 dark:text-white">Pipeline Status</h2>}>
-          <div className="flex flex-col gap-0">
-            {STAGES.map((stage, idx) => {
-              let state: "pending" | "active" | "completed" | "failed" = "pending";
-              if (isFailed && idx === activeIdx) {
-                state = "failed";
-              } else if (idx < activeIdx || isCompleted) {
-                state = "completed";
-              } else if (idx === activeIdx && !isFailed) {
-                state = "active";
-              }
-
-              return (
-                <div key={stage.key}>
-                  <div className="flex items-center gap-3 py-2">
-                    <StepIcon state={state} />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">
-                        {stage.label}
-                      </p>
-                      {latestMessages[stage.key] && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {latestMessages[stage.key]}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  {idx < STAGES.length - 1 && (
-                    <div className="ml-[11px] h-4 w-0.5 bg-gray-200 dark:bg-gray-700" />
-                  )}
+      <main className={`mx-auto px-4 py-12 ${streamUrl ? "max-w-6xl" : "max-w-xl"}`}>
+        {streamUrl ? (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+            {pipelineStepper}
+            <Card
+              header={
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-3 w-3">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                    <span className="relative inline-flex h-3 w-3 rounded-full bg-red-500" />
+                  </span>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Live Preview</h2>
                 </div>
-              );
-            })}
-          </div>
-
-          {sseError && (
-            <p className="mt-4 text-sm text-yellow-600">{sseError} (using polling fallback)</p>
-          )}
-
-          {isFailed && (
-            <div className="mt-4">
-              <p className="text-sm text-red-600">
-                {run?.error ?? "Pipeline failed. Please try again."}
+              }
+            >
+              <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+                Watch your app building and running inside the sandbox in real time.
               </p>
-              <Button
-                variant="secondary"
-                className="mt-3"
-                onClick={() => router.push("/dashboard")}
-              >
-                Try Another Repo
-              </Button>
-            </div>
-          )}
-
-          {isCompleted && (
-            <div className="mt-6">
-              <Button onClick={() => router.push(`/runs/${id}/review`)}>
-                Review Results
-              </Button>
-            </div>
-          )}
-        </Card>
+              <div className="aspect-[16/10] w-full overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
+                <iframe
+                  src={streamUrl}
+                  className="h-full w-full"
+                  sandbox="allow-scripts allow-same-origin"
+                  title="Live sandbox preview"
+                />
+              </div>
+            </Card>
+          </div>
+        ) : (
+          pipelineStepper
+        )}
       </main>
     </div>
   );

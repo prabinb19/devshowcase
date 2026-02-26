@@ -77,6 +77,7 @@ export interface RunResponse {
 export interface SSEEvent {
   stage: string;
   message: string;
+  stream_url?: string | null;
 }
 
 export interface LinkedInStatus {
