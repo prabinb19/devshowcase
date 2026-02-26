@@ -65,22 +65,23 @@
 
 ## Section 5: Capture Node (Screenshots)
 
-- [ ] Build custom E2B template Dockerfile (Node 20, Python 3.12, Playwright, Chromium)
-- [ ] Register E2B template and store template ID in config
-- [ ] Implement Strategy A: extract image URLs from README, download and validate (must be real images, <5MB)
-- [ ] Implement Strategy B: sandbox screenshot for web apps
+- [ ] Build custom E2B template Dockerfile (Node 20, Python 3.12, Playwright, Chromium) _(deferred — ops task)_
+- [ ] Register E2B template and store template ID in config _(deferred — ops task)_
+- [x] Implement Strategy A: extract README images — download up to 3, validate, process, upload to R2
+- [ ] Implement Strategy B: sandbox screenshot for web apps _(MVP: falls back to project card; needs E2B Desktop)_
   - [ ] Detect framework from `package.json` (Next.js, Vite, CRA, etc.)
   - [ ] Generate install + build + preview commands per framework
   - [ ] Run `npm install && npm run build && npm run preview` in E2B sandbox
   - [ ] Wait for server ready with `domcontentloaded` + fixed wait (not `networkidle`)
   - [ ] Take screenshots at 1s, 3s, 5s intervals — pick sharpest/largest
   - [ ] Enforce 5-minute sandbox hard limit
-- [ ] Implement Strategy D: generate project card via Satori (`1200x630px`, project name + tech stack + description)
-- [ ] Implement fallback chain: sandbox → README images → project card
-- [ ] Add image post-processing: resize to max 2048px wide, compress to <1MB, normalize to JPG
-- [ ] Set up Cloudflare R2 bucket and configure S3-compatible credentials
-- [ ] Implement R2 upload function — upload processed images, return public URLs
-- [ ] Write integration tests with 10 diverse repos (React app, Python CLI, Rust lib, Go service, etc.)
+- [x] Implement Strategy C: generate project card via Pillow (`1200x630px`, dark slate, project name + tech stack + features)
+- [x] Implement fallback chain: sandbox → project card, readme_images → project card if empty
+- [x] Add image post-processing: resize to max 1200px, compress, RGBA→RGB for JPEG
+- [ ] Set up Cloudflare R2 bucket and configure S3-compatible credentials _(manual step)_
+- [x] Implement R2 upload function — lazy singleton boto3 client, content-hash dedup, public URL return
+- [x] Replace capture node stub with strategy router (reads `screenshot_strategy` from analysis)
+- [x] Write unit tests for capture node and all screenshot services (29 tests)
 
 ---
 
@@ -255,3 +256,47 @@
 - Model: `claude-sonnet-4-20250514` — cost-effective for analysis
 
 **Test suite:** 54 total tests passing (21 new + 33 existing from Sections 1-3)
+
+### Section 5 Review (2026-02-25)
+
+**Completed (7 items, 29 tests):**
+- `backend/app/services/image_processor.py` — Pillow-based image utilities
+  - `validate_image()` — verify bytes are a valid image via PIL verify
+  - `get_dimensions()` — return (width, height) tuple
+  - `process_image()` — resize preserving aspect ratio, RGBA→RGB for JPEG, compress with optimize
+- `backend/app/services/r2_storage.py` — Cloudflare R2 upload client
+  - `_get_r2_client()` lazy singleton boto3 S3 client using `settings.r2_*` credentials
+  - `upload_image()` — uploads to `screenshots/{run_id}/{content_hash}_{filename}`, returns public URL
+  - Content-hash (SHA-256 prefix) in key for free deduplication
+- `backend/app/services/screenshot/` — strategy pattern package
+  - `readme_images.py` — downloads up to 3 README images, resolves relative/blob GitHub URLs, validates, processes, uploads
+  - `project_card.py` — Pillow-rendered 1200×630 LinkedIn card (dark slate bg, blue accent, name, description, tech tags, features, stars/language)
+  - `sandbox.py` — MVP stub that logs and falls back to `generate_project_card()`, documented for future E2B Desktop
+  - `__init__.py` — re-exports all three strategies
+- `backend/app/nodes/capture.py` — replaced stub with strategy router
+  - Reads `screenshot_strategy` from analysis, dispatches to appropriate service
+  - Builds common `card_kwargs` from metadata + analysis for project card / sandbox
+  - Fallback: readme_images → project_card if no valid images captured
+  - Error handling returns `{"error": ..., "current_stage": "capturing"}`
+- `backend/tests/test_capture.py` — 29 unit tests
+  - Image processor (5): validate valid/invalid/empty, resize with aspect ratio, RGBA→RGB for JPEG
+  - R2 storage (3): put_object called, returns URL, content-hash dedup
+  - URL resolution (4): absolute unchanged, relative resolved, blob converted, dot-slash handled
+  - README images (4): happy path, skip invalid, cap at 3, handle download failure
+  - Project card (2): generates valid PNG 1200×630, handles missing fields
+  - Sandbox (1): falls back to project card
+  - Capture node (6): routes to project_card/sandbox/readme_images, readme fallback, missing analysis/repo_context errors
+
+**Architecture:**
+- Strategy pattern: `services/screenshot/` package, capture node is thin router (consistent with ingest/analyze)
+- Sandbox stub in `sandbox.py` — only this file changes when E2B Desktop is integrated
+- boto3 synchronous for MVP — images <1MB, blocking negligible; `asyncio.to_thread()` later if needed
+- Pillow for project cards — no Satori/Node.js dependency needed
+- 3-image cap for README — limits cost and processing time
+
+**Deferred items:**
+- E2B template Dockerfile and registration (ops task)
+- Real sandbox screenshots via E2B Desktop + Playwright (only touches `sandbox.py`)
+- Cloudflare R2 bucket setup (manual step)
+
+**Test suite:** 83 total tests passing (29 new + 54 existing from Sections 1-4)
