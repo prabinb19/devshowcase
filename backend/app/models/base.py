@@ -13,10 +13,11 @@ class Base(DeclarativeBase):
 
 class RunStatus(str, enum.Enum):
     pending = "pending"
-    ingesting = "ingesting"
-    analyzing = "analyzing"
-    capturing = "capturing"
-    generating = "generating"
+    agent_starting = "agent_starting"
+    agent_exploring = "agent_exploring"
+    agent_generating = "agent_generating"
+    agent_awaiting_answer = "agent_awaiting_answer"
+    agent_updating_portfolio = "agent_updating_portfolio"
     completed = "completed"
     failed = "failed"
 
@@ -69,6 +70,7 @@ class Run(Base):
     analysis: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     screenshots: Mapped[list | None] = mapped_column(JSON, nullable=True)
     post_draft: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    agent_output: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

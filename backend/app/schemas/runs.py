@@ -29,6 +29,7 @@ class RunDetailResponse(BaseModel):
     analysis: dict | None = None
     screenshots: list[dict] | None = None
     post_draft: dict | None = None
+    agent_output: dict | None = None
     created_at: datetime
     updated_at: datetime
 

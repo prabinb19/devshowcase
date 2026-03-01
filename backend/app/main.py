@@ -7,7 +7,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.graph import init_graph, shutdown_graph
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.routes.drafts import router as drafts_router
 from app.routes.linkedin import router as linkedin_router
@@ -18,20 +17,11 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-_pipeline_healthy = False
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _pipeline_healthy  # noqa: PLW0603
-    try:
-        await init_graph(settings.checkpoint_url)
-        _pipeline_healthy = True
-        logger.info("Pipeline initialized successfully")
-    except Exception as exc:
-        logger.error("Failed to initialize pipeline: %s", exc, exc_info=True)
+    logger.info("DevShowcase API started")
     yield
-    await shutdown_graph()
+    logger.info("DevShowcase API shutting down")
 
 
 app = FastAPI(title="DevShowcase API", version="0.1.0", lifespan=lifespan)
@@ -53,5 +43,4 @@ app.include_router(settings_router, prefix="/api")
 
 @app.get("/health")
 async def health() -> dict[str, str]:
-    status = "ok" if _pipeline_healthy else "degraded"
-    return {"status": status}
+    return {"status": "ok"}

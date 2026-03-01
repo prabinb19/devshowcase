@@ -30,6 +30,7 @@ export function useSSE(url: string | null) {
   const [isDone, setIsDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const [pendingQuestion, setPendingQuestion] = useState<import("@/types").AgentQuestion | null>(null);
   const sourceRef = useRef<EventSource | null>(null);
 
   const reset = useCallback(() => {
@@ -57,6 +58,17 @@ export function useSSE(url: string | null) {
       }
     });
 
+    es.addEventListener("question", (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.question) {
+          setPendingQuestion(data.question);
+        }
+      } catch {
+        // ignore parse errors
+      }
+    });
+
     es.addEventListener("done", () => {
       setIsDone(true);
       setStreamUrl(null);
@@ -81,5 +93,7 @@ export function useSSE(url: string | null) {
     };
   }, [url]);
 
-  return { events, isDone, error, streamUrl, reset };
+  const clearQuestion = useCallback(() => setPendingQuestion(null), []);
+
+  return { events, isDone, error, streamUrl, pendingQuestion, clearQuestion, reset };
 }

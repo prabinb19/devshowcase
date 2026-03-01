@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { useUser } from "@/lib/hooks";
 import {
   getRun,
-  regenerateRun,
   createDraft,
   getLinkedInStatus,
   getLinkedInAuthUrl,
@@ -30,15 +29,12 @@ export default function ReviewPage() {
   const [selectedScreenshots, setSelectedScreenshots] = useState<Set<number>>(new Set());
   const [altTexts, setAltTexts] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
-  const [regenerating, setRegenerating] = useState(false);
-  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-  const [feedback, setFeedback] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Initialize state from run data once loaded
-  const draft = run?.post_draft;
+  const draft = run?.post_draft ?? run?.agent_output?.post_draft ?? null;
   const displayBody = body ?? draft?.body ?? "";
   const displayComment = firstComment ?? draft?.first_comment ?? "";
   const displayAltTexts = altTexts.length > 0 ? altTexts : draft?.alt_texts ?? [];
@@ -100,19 +96,6 @@ export default function ReviewPage() {
     } catch {
       setError("Failed to save draft. Please try again.");
       setSaving(false);
-    }
-  }
-
-  async function handleRegenerate() {
-    if (!feedback.trim()) return;
-    setRegenerating(true);
-    setError(null);
-    try {
-      const data = await regenerateRun(id, feedback.trim());
-      router.push(`/runs/${data.run_id}`);
-    } catch {
-      setError("Failed to regenerate. Please try again.");
-      setRegenerating(false);
     }
   }
 
@@ -350,9 +333,6 @@ export default function ReviewPage() {
             <Button loading={publishing} onClick={handlePublish}>
               Publish to LinkedIn
             </Button>
-            <Button variant="secondary" onClick={() => setShowFeedbackModal(true)}>
-              Regenerate with Feedback
-            </Button>
             <Button variant="secondary" loading={saving} onClick={handleSaveDraft}>
               Save as Draft
             </Button>
@@ -363,33 +343,17 @@ export default function ReviewPage() {
           {(error || publishError) && (
             <p className="text-sm text-red-600">{error || publishError}</p>
           )}
+          {run?.agent_output?.portfolio_pr_url && (
+            <a
+              href={run.agent_output.portfolio_pr_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+            >
+              View Portfolio PR
+            </a>
+          )}
         </div>
-
-        {/* Feedback Modal */}
-        {showFeedbackModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-lg dark:bg-gray-900">
-              <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
-                Regeneration Feedback
-              </h3>
-              <textarea
-                rows={4}
-                className="mb-4 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-                placeholder="What should be different in the next version?"
-                value={feedback}
-                onChange={(e) => setFeedback(e.target.value)}
-              />
-              <div className="flex justify-end gap-3">
-                <Button variant="ghost" onClick={() => setShowFeedbackModal(false)}>
-                  Cancel
-                </Button>
-                <Button loading={regenerating} onClick={handleRegenerate}>
-                  Submit
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
       </main>
     </div>
   );

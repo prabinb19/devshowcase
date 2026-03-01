@@ -1,9 +1,10 @@
 export type RunStatus =
   | "pending"
-  | "ingesting"
-  | "analyzing"
-  | "capturing"
-  | "generating"
+  | "agent_starting"
+  | "agent_exploring"
+  | "agent_generating"
+  | "agent_awaiting_answer"
+  | "agent_updating_portfolio"
   | "completed"
   | "failed";
 
@@ -19,6 +20,7 @@ export interface RunDetail {
   analysis: Record<string, unknown> | null;
   screenshots: Record<string, unknown>[] | null;
   post_draft: PostDraft | null;
+  agent_output: AgentOutput | null;
   created_at: string;
   updated_at: string;
 }
@@ -78,6 +80,20 @@ export interface SSEEvent {
   stage: string;
   message: string;
   stream_url?: string | null;
+  question?: AgentQuestion | null;
+}
+
+export interface AgentQuestion {
+  question_id: string;
+  text: string;
+  options?: string[] | null;
+}
+
+export interface AgentOutput {
+  post_draft: PostDraft;
+  images: Array<{ url: string; alt_text: string; source: string }>;
+  exploration_log: string;
+  portfolio_pr_url: string | null;
 }
 
 export interface LinkedInStatus {

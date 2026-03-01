@@ -5,8 +5,10 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && npm install -g npm@latest
 
-# Python 3.12 + pip (for Python project support)
-RUN apt-get update && apt-get install -y \
+# Python 3.12 + pip (base image is Ubuntu 22.04, needs deadsnakes PPA)
+RUN apt-get update && apt-get install -y software-properties-common \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
+    && apt-get update && apt-get install -y \
     python3.12 python3.12-venv python3-pip \
     && rm -rf /var/lib/apt/lists/*
 

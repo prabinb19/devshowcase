@@ -1,24 +1,37 @@
 "use client";
 
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import useSWR from "swr";
 import { Navbar } from "@/components/navbar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useSSE } from "@/lib/hooks";
-import { getRun, getSSEUrl } from "@/lib/api";
-import type { RunStatus } from "@/types";
+import { getRun, getSSEUrl, answerAgentQuestion } from "@/lib/api";
+import type { RunStatus, AgentQuestion } from "@/types";
 
-const STAGES: { key: RunStatus; label: string }[] = [
-  { key: "ingesting", label: "Ingesting repo data" },
-  { key: "analyzing", label: "Analyzing project" },
-  { key: "capturing", label: "Capturing screenshots" },
-  { key: "generating", label: "Generating post draft" },
+const STAGES: { key: string; label: string }[] = [
+  { key: "agent_starting", label: "Starting secure sandbox" },
+  { key: "agent_exploring", label: "Exploring repository" },
+  { key: "agent_generating", label: "Generating LinkedIn post" },
+  { key: "agent_updating_portfolio", label: "Updating portfolio" },
   { key: "completed", label: "Complete" },
 ];
 
+const STATUS_TO_STAGE: Record<string, string> = {
+  pending: "agent_starting",
+  agent_starting: "agent_starting",
+  agent_exploring: "agent_exploring",
+  agent_generating: "agent_generating",
+  agent_awaiting_answer: "agent_generating",
+  agent_updating_portfolio: "agent_updating_portfolio",
+  completed: "completed",
+  failed: "failed",
+};
+
 function stageIndex(status: RunStatus): number {
-  const idx = STAGES.findIndex((s) => s.key === status);
+  const mapped = STATUS_TO_STAGE[status] ?? status;
+  const idx = STAGES.findIndex((s) => s.key === mapped);
   return idx === -1 ? -1 : idx;
 }
 
@@ -47,12 +60,75 @@ function StepIcon({ state }: { state: "pending" | "active" | "completed" | "fail
   return <div className="h-6 w-6 rounded-full border-2 border-gray-300 dark:border-gray-600" />;
 }
 
+function QuestionDialog({
+  question,
+  runId,
+  onAnswered,
+}: {
+  question: AgentQuestion;
+  runId: string;
+  onAnswered: () => void;
+}) {
+  const [answer, setAnswer] = useState("");
+  const [sending, setSending] = useState(false);
+
+  async function handleSubmit(text: string) {
+    setSending(true);
+    try {
+      await answerAgentQuestion(runId, text);
+      onAnswered();
+    } catch {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-lg dark:bg-gray-900">
+        <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
+          Agent Question
+        </h3>
+        <p className="mb-4 text-sm text-gray-700 dark:text-gray-300">{question.text}</p>
+
+        {question.options && question.options.length > 0 ? (
+          <div className="flex flex-col gap-2">
+            {question.options.map((opt) => (
+              <Button
+                key={opt}
+                variant="secondary"
+                loading={sending}
+                onClick={() => handleSubmit(opt)}
+                className="justify-start text-left"
+              >
+                {opt}
+              </Button>
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <textarea
+              rows={3}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+              placeholder="Type your answer..."
+              value={answer}
+              onChange={(e) => setAnswer(e.target.value)}
+            />
+            <Button loading={sending} onClick={() => handleSubmit(answer)} disabled={!answer.trim()}>
+              Send Answer
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function RunStatusPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
 
-  const { events, isDone, error: sseError, streamUrl } = useSSE(getSSEUrl(id));
+  const { events, isDone, error: sseError, pendingQuestion, clearQuestion } = useSSE(getSSEUrl(id));
   const { data: run } = useSWR(`/run/${id}`, () => getRun(id), {
     refreshInterval: 3000,
   });
@@ -68,106 +144,81 @@ export default function RunStatusPage() {
     latestMessages[evt.stage] = evt.message;
   }
 
-  const pipelineStepper = (
-    <Card header={<h2 className="text-lg font-semibold text-gray-900 dark:text-white">Pipeline Status</h2>}>
-      <div className="flex flex-col gap-0">
-        {STAGES.map((stage, idx) => {
-          let state: "pending" | "active" | "completed" | "failed" = "pending";
-          if (isFailed && idx === activeIdx) {
-            state = "failed";
-          } else if (idx < activeIdx || isCompleted) {
-            state = "completed";
-          } else if (idx === activeIdx && !isFailed) {
-            state = "active";
-          }
-
-          return (
-            <div key={stage.key}>
-              <div className="flex items-center gap-3 py-2">
-                <StepIcon state={state} />
-                <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    {stage.label}
-                  </p>
-                  {latestMessages[stage.key] && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {latestMessages[stage.key]}
-                    </p>
-                  )}
-                </div>
-              </div>
-              {idx < STAGES.length - 1 && (
-                <div className="ml-[11px] h-4 w-0.5 bg-gray-200 dark:bg-gray-700" />
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {sseError && (
-        <p className="mt-4 text-sm text-yellow-600">{sseError} (using polling fallback)</p>
-      )}
-
-      {isFailed && (
-        <div className="mt-4">
-          <p className="text-sm text-red-600">
-            {run?.error ?? "Pipeline failed. Please try again."}
-          </p>
-          <Button
-            variant="secondary"
-            className="mt-3"
-            onClick={() => router.push("/dashboard")}
-          >
-            Try Another Repo
-          </Button>
-        </div>
-      )}
-
-      {isCompleted && (
-        <div className="mt-6">
-          <Button onClick={() => router.push(`/runs/${id}/review`)}>
-            Review Results
-          </Button>
-        </div>
-      )}
-    </Card>
-  );
-
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <Navbar />
-      <main className={`mx-auto px-4 py-12 ${streamUrl ? "max-w-6xl" : "max-w-xl"}`}>
-        {streamUrl ? (
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-            {pipelineStepper}
-            <Card
-              header={
-                <div className="flex items-center gap-2">
-                  <span className="relative flex h-3 w-3">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
-                    <span className="relative inline-flex h-3 w-3 rounded-full bg-red-500" />
-                  </span>
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Live Preview</h2>
-                </div>
+      <main className="mx-auto max-w-xl px-4 py-12">
+        <Card header={<h2 className="text-lg font-semibold text-gray-900 dark:text-white">Agent Status</h2>}>
+          <div className="flex flex-col gap-0">
+            {STAGES.map((stage, idx) => {
+              let state: "pending" | "active" | "completed" | "failed" = "pending";
+              if (isFailed && idx === activeIdx) {
+                state = "failed";
+              } else if (idx < activeIdx || isCompleted) {
+                state = "completed";
+              } else if (idx === activeIdx && !isFailed) {
+                state = "active";
               }
-            >
-              <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-                Watch your app building and running inside the sandbox in real time.
-              </p>
-              <div className="aspect-[16/10] w-full overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
-                <iframe
-                  src={streamUrl}
-                  className="h-full w-full"
-                  sandbox="allow-scripts allow-same-origin"
-                  title="Live sandbox preview"
-                />
-              </div>
-            </Card>
+
+              return (
+                <div key={stage.key}>
+                  <div className="flex items-center gap-3 py-2">
+                    <StepIcon state={state} />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        {stage.label}
+                      </p>
+                      {latestMessages[stage.key] && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {latestMessages[stage.key]}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {idx < STAGES.length - 1 && (
+                    <div className="ml-[11px] h-4 w-0.5 bg-gray-200 dark:bg-gray-700" />
+                  )}
+                </div>
+              );
+            })}
           </div>
-        ) : (
-          pipelineStepper
-        )}
+
+          {sseError && (
+            <p className="mt-4 text-sm text-yellow-600">{sseError} (using polling fallback)</p>
+          )}
+
+          {isFailed && (
+            <div className="mt-4">
+              <p className="text-sm text-red-600">
+                {run?.error ?? "Agent failed. Please try again."}
+              </p>
+              <Button
+                variant="secondary"
+                className="mt-3"
+                onClick={() => router.push("/dashboard")}
+              >
+                Try Another Repo
+              </Button>
+            </div>
+          )}
+
+          {isCompleted && (
+            <div className="mt-6">
+              <Button onClick={() => router.push(`/runs/${id}/review`)}>
+                Review Results
+              </Button>
+            </div>
+          )}
+        </Card>
       </main>
+
+      {pendingQuestion && (
+        <QuestionDialog
+          question={pendingQuestion}
+          runId={id}
+          onAnswered={clearQuestion}
+        />
+      )}
     </div>
   );
 }

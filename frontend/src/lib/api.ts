@@ -41,14 +41,11 @@ export function getRun(runId: string) {
   return apiFetch<import("@/types").RunDetail>(`/api/runs/${runId}`);
 }
 
-export function regenerateRun(runId: string, feedback: string) {
-  return apiFetch<{ run_id: string; status: string }>(
-    `/api/runs/${runId}/regenerate`,
-    {
-      method: "POST",
-      body: JSON.stringify({ feedback }),
-    }
-  );
+export function answerAgentQuestion(runId: string, text: string) {
+  return apiFetch<void>(`/api/runs/${runId}/answer`, {
+    method: "POST",
+    body: JSON.stringify({ text }),
+  });
 }
 
 export function getSSEUrl(runId: string) {
