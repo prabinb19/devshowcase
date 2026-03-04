@@ -94,21 +94,8 @@ def sample_token(user_id: uuid.UUID, fernet_key: str) -> Token:
     )
 
 
-@pytest.fixture
-def mock_graph():
-    """Patch the compiled_graph and lifespan so tests don't need Postgres."""
-    mock = AsyncMock()
-    mock.ainvoke = AsyncMock(return_value={"current_stage": "completed"})
-    with (
-        patch("app.graph.init_graph", new_callable=AsyncMock),
-        patch("app.graph.shutdown_graph", new_callable=AsyncMock),
-        patch("app.graph.compiled_graph", mock),
-    ):
-        yield mock
-
-
 @pytest_asyncio.fixture
-async def client(mock_graph):
+async def client():
     from app.main import app
 
     transport = ASGITransport(app=app)

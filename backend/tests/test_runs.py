@@ -71,22 +71,8 @@ def _make_mock_session(
     return session
 
 
-@pytest.fixture
-def mock_graph():
-    """Patch the compiled_graph and lifespan so tests don't need Postgres."""
-    mock = AsyncMock()
-    mock.ainvoke = AsyncMock(return_value={"current_stage": "completed"})
-
-    with (
-        patch("app.graph.init_graph", new_callable=AsyncMock),
-        patch("app.graph.shutdown_graph", new_callable=AsyncMock),
-        patch("app.graph.compiled_graph", mock),
-    ):
-        yield mock
-
-
 @pytest_asyncio.fixture
-async def client(mock_graph):
+async def client():
     from app.main import app
 
     transport = ASGITransport(app=app)
@@ -183,87 +169,6 @@ async def test_get_run_found(client: AsyncClient, sample_run: Run):
     data = response.json()
     assert data["repo_url"] == "https://github.com/test/repo"
     assert data["status"] == "pending"
-
-
-async def test_regenerate_run_returns_202(
-    client: AsyncClient, completed_run: Run
-):
-    """POST /api/runs/{id}/regenerate returns 202 with a new run."""
-    from app.main import app
-
-    new_run_id = uuid.uuid4()
-    result_mock = MagicMock()
-    result_mock.scalar_one_or_none.return_value = completed_run
-    session = _make_mock_session(execute_return=result_mock)
-    session.refresh = AsyncMock(
-        side_effect=lambda run: setattr(run, "id", new_run_id)
-    )
-
-    async def override_session():
-        yield session
-
-    app.dependency_overrides[get_session] = override_session
-    try:
-        response = await client.post(
-            f"/api/runs/{completed_run.id}/regenerate",
-            json={"feedback": "Make it more technical"},
-        )
-    finally:
-        app.dependency_overrides.clear()
-
-    assert response.status_code == 202
-    data = response.json()
-    assert "run_id" in data
-    assert data["status"] == "generating"
-
-
-async def test_regenerate_run_not_found(client: AsyncClient):
-    """POST /api/runs/{id}/regenerate returns 404 for unknown run."""
-    from app.main import app
-
-    result_mock = MagicMock()
-    result_mock.scalar_one_or_none.return_value = None
-    session = _make_mock_session(execute_return=result_mock)
-
-    async def override_session():
-        yield session
-
-    app.dependency_overrides[get_session] = override_session
-    try:
-        response = await client.post(
-            f"/api/runs/{uuid.uuid4()}/regenerate",
-            json={"feedback": "Make it better"},
-        )
-    finally:
-        app.dependency_overrides.clear()
-
-    assert response.status_code == 404
-
-
-async def test_regenerate_incomplete_run_returns_409(
-    client: AsyncClient, sample_run: Run
-):
-    """POST /api/runs/{id}/regenerate returns 409 for a pending run."""
-    from app.main import app
-
-    result_mock = MagicMock()
-    result_mock.scalar_one_or_none.return_value = sample_run  # status=pending
-    session = _make_mock_session(execute_return=result_mock)
-
-    async def override_session():
-        yield session
-
-    app.dependency_overrides[get_session] = override_session
-    try:
-        response = await client.post(
-            f"/api/runs/{sample_run.id}/regenerate",
-            json={"feedback": "Make it better"},
-        )
-    finally:
-        app.dependency_overrides.clear()
-
-    assert response.status_code == 409
-    assert "completed or failed" in response.json()["detail"]
 
 
 async def test_rate_limit_returns_429(

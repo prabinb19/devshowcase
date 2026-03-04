@@ -19,8 +19,16 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if settings.checkpoint_url:
+        from app.graph import init_graph, shutdown_graph
+
+        await init_graph(settings.checkpoint_url)
     logger.info("DevShowcase API started")
     yield
+    if settings.checkpoint_url:
+        from app.graph import shutdown_graph
+
+        await shutdown_graph()
     logger.info("DevShowcase API shutting down")
 
 

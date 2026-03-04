@@ -1,3 +1,4 @@
 # E2B template for DevShowcase agent sandbox
+template_id = "vnmoypn1vgmsiple4hfc"
 template_name = "devshowcase-agent"
 dockerfile = "Dockerfile"

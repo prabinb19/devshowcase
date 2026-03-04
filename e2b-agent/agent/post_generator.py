@@ -42,7 +42,7 @@ def generate_post(
     user_prompt = _build_prompt(exploration, images)
 
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash",
         contents=user_prompt,
         config=genai_types.GenerateContentConfig(
             response_mime_type="application/json",

@@ -8,7 +8,7 @@ import logging
 import uuid
 from typing import Any
 
-from e2b_desktop import Sandbox
+from e2b import Sandbox
 
 from app.config import settings
 from app.database import async_session
@@ -42,7 +42,7 @@ async def start_agent_run(run_id: uuid.UUID, user_id: uuid.UUID, repo_url: str) 
         queue.put_nowait({"stage": "agent_starting", "message": "Starting secure sandbox..."})
 
         # Create E2B sandbox
-        sandbox = Sandbox(
+        sandbox = Sandbox.create(
             template=settings.e2b_template_id or None,
             timeout=settings.agent_sandbox_timeout,
             envs={"CI": "true"},
