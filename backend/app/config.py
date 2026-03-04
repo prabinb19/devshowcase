@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     portfolio_repo: str = ""
     portfolio_owner: str = ""
+    e2b_enable_stream: bool = True
     agent_sandbox_timeout: int = 600
     rate_limit_runs_per_hour: int = 10
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:3001"]

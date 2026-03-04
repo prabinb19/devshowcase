@@ -128,7 +128,7 @@ export default function RunStatusPage() {
   const router = useRouter();
   const id = params.id as string;
 
-  const { events, isDone, error: sseError, pendingQuestion, clearQuestion } = useSSE(getSSEUrl(id));
+  const { events, isDone, error: sseError, streamUrl, pendingQuestion, clearQuestion } = useSSE(getSSEUrl(id));
   const { data: run } = useSWR(`/run/${id}`, () => getRun(id), {
     refreshInterval: 3000,
   });
@@ -210,6 +210,33 @@ export default function RunStatusPage() {
             </div>
           )}
         </Card>
+
+        {streamUrl && !isCompleted && !isFailed && (
+          <Card
+            header={
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Live Sandbox View
+                </h2>
+              </div>
+            }
+            className="mt-6"
+          >
+            <div className="relative w-full overflow-hidden rounded-lg" style={{ aspectRatio: "16/10" }}>
+              <iframe
+                src={streamUrl}
+                className="absolute inset-0 h-full w-full border-0"
+                allow="autoplay"
+                sandbox="allow-scripts allow-same-origin"
+                title="Agent sandbox live stream"
+              />
+            </div>
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              Watching the AI agent work in real time. View only.
+            </p>
+          </Card>
+        )}
       </main>
 
       {pendingQuestion && (

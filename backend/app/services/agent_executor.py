@@ -8,7 +8,7 @@ import logging
 import uuid
 from typing import Any
 
-from e2b import Sandbox
+from e2b_desktop import Sandbox as DesktopSandbox
 
 from app.config import settings
 from app.database import async_session
@@ -18,10 +18,23 @@ logger = logging.getLogger(__name__)
 
 # In-memory state for active agent sessions
 _agent_events: dict[str, asyncio.Queue[dict[str, Any]]] = {}
-_agent_sandboxes: dict[str, Sandbox] = {}
+_agent_sandboxes: dict[str, DesktopSandbox] = {}
 _pending_questions: dict[str, dict[str, Any]] = {}
 
 # Map agent progress stages to RunStatus values
+def _start_stream(sandbox: DesktopSandbox) -> str | None:
+    """Start desktop stream and return the view-only URL, or None on failure."""
+    if not settings.e2b_enable_stream:
+        return None
+    try:
+        sandbox.stream.start(require_auth=True)
+        auth_key = sandbox.stream.get_auth_key()
+        return sandbox.stream.get_url(auth_key=auth_key, view_only=True)
+    except Exception as exc:
+        logger.warning("Failed to start desktop stream: %s", exc)
+        return None
+
+
 _STAGE_TO_STATUS: dict[str, RunStatus] = {
     "exploring": RunStatus.agent_exploring,
     "extracting_images": RunStatus.agent_exploring,
@@ -41,14 +54,24 @@ async def start_agent_run(run_id: uuid.UUID, user_id: uuid.UUID, repo_url: str) 
         await _update_run_status(run_id, RunStatus.agent_starting)
         queue.put_nowait({"stage": "agent_starting", "message": "Starting secure sandbox..."})
 
-        # Create E2B sandbox
-        sandbox = Sandbox.create(
+        # Create E2B desktop sandbox (sync SDK — run off event loop)
+        sandbox = await asyncio.to_thread(
+            DesktopSandbox.create,
             template=settings.e2b_template_id or None,
             timeout=settings.agent_sandbox_timeout,
+            resolution=(1280, 800),
             envs={"CI": "true"},
             api_key=settings.e2b_api_key,
         )
         _agent_sandboxes[rid] = sandbox
+
+        stream_url = await asyncio.to_thread(_start_stream, sandbox)
+        if stream_url:
+            queue.put_nowait({
+                "stage": "agent_starting",
+                "message": "Sandbox ready — live view active",
+                "stream_url": stream_url,
+            })
 
         # Write mission file
         mission = {
@@ -58,10 +81,14 @@ async def start_agent_run(run_id: uuid.UUID, user_id: uuid.UUID, repo_url: str) 
             "portfolio_repo": settings.portfolio_repo,
             "portfolio_owner": settings.portfolio_owner,
         }
-        sandbox.files.write("/comms/mission.json", json.dumps(mission))
+        await asyncio.to_thread(
+            sandbox.files.write, "/comms/mission.json", json.dumps(mission)
+        )
 
         # Start the agent process
-        sandbox.commands.run("python3 /agent/main.py", background=True)
+        await asyncio.to_thread(
+            sandbox.commands.run, "python3 /agent/main.py", background=True
+        )
 
         # Monitor the agent
         await _monitor_agent(run_id, sandbox, queue)
@@ -76,7 +103,7 @@ async def start_agent_run(run_id: uuid.UUID, user_id: uuid.UUID, repo_url: str) 
 
 async def _monitor_agent(
     run_id: uuid.UUID,
-    sandbox: Sandbox,
+    sandbox: DesktopSandbox,
     queue: asyncio.Queue[dict[str, Any]],
 ) -> None:
     """Poll sandbox files for progress updates."""
@@ -88,9 +115,11 @@ async def _monitor_agent(
         await asyncio.sleep(2)
 
         try:
-            # Check status
+            # Check status (sync SDK calls off event loop)
             try:
-                status_raw = sandbox.files.read("/comms/status.json")
+                status_raw = await asyncio.to_thread(
+                    sandbox.files.read, "/comms/status.json"
+                )
                 status_data = json.loads(status_raw)
             except Exception:
                 continue
@@ -98,7 +127,9 @@ async def _monitor_agent(
             if status_data.get("status") == "completed":
                 # Read final result
                 try:
-                    result_raw = sandbox.files.read("/output/result.json")
+                    result_raw = await asyncio.to_thread(
+                        sandbox.files.read, "/output/result.json"
+                    )
                     result = json.loads(result_raw)
                 except Exception:
                     result = {}
@@ -116,7 +147,9 @@ async def _monitor_agent(
 
             # Check progress
             try:
-                progress_raw = sandbox.files.read("/comms/progress.json")
+                progress_raw = await asyncio.to_thread(
+                    sandbox.files.read, "/comms/progress.json"
+                )
                 progress = json.loads(progress_raw)
                 stage = progress.get("stage", "")
                 if stage and stage != last_progress_stage:
@@ -131,7 +164,9 @@ async def _monitor_agent(
 
             # Check for questions
             try:
-                question_raw = sandbox.files.read("/comms/question.json")
+                question_raw = await asyncio.to_thread(
+                    sandbox.files.read, "/comms/question.json"
+                )
                 question = json.loads(question_raw)
                 qid = question.get("question_id", "")
                 if qid and qid != last_question_id:
@@ -162,7 +197,9 @@ async def submit_answer(run_id: str, answer_text: str) -> None:
         "question_id": question["question_id"],
         "text": answer_text,
     }
-    sandbox.files.write("/comms/answer.json", json.dumps(answer))
+    await asyncio.to_thread(
+        sandbox.files.write, "/comms/answer.json", json.dumps(answer)
+    )
 
 
 def get_event_queue(run_id: str) -> asyncio.Queue[dict[str, Any]] | None:

@@ -219,8 +219,8 @@ pip install -e ".[dev]"
 # Run database migrations
 alembic upgrade head
 
-# Start the backend server
-uvicorn app.main:app --reload --port 8000
+# Start the backend server (auto-excludes .venv from reload watcher)
+make dev
 ```
 
 Verify: open [http://localhost:8000/health](http://localhost:8000/health) — should return `{"status": "ok"}`
@@ -267,7 +267,7 @@ Verify: open [http://localhost:3000](http://localhost:3000)
 
 ```bash
 cd backend
-.venv/bin/python -m pytest tests/ -v
+make test
 ```
 
 Tests use mocks — no real API keys needed.
