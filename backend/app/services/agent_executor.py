@@ -6,13 +6,18 @@ import asyncio
 import json
 import logging
 import uuid
+from pathlib import Path
 from typing import Any
 
 from e2b_desktop import Sandbox as DesktopSandbox
+from e2b.sandbox.commands.command_handle import CommandExitException
 
 from app.config import settings
 from app.database import async_session
 from app.models import Run, RunStatus
+
+# Agent source files live alongside this repo
+_AGENT_SRC_DIR = Path(__file__).resolve().parents[3] / "e2b-agent" / "agent"
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +38,42 @@ def _start_stream(sandbox: DesktopSandbox) -> str | None:
     except Exception as exc:
         logger.warning("Failed to start desktop stream: %s", exc)
         return None
+
+
+_AGENT_STARTUP_TIMEOUT = 120  # seconds to wait for status.json before failing
+
+
+async def _provision_agent(sandbox: DesktopSandbox, queue: asyncio.Queue[dict[str, Any]]) -> None:
+    """Upload agent source files and ensure Python deps are installed."""
+    queue.put_nowait({"stage": "agent_starting", "message": "Provisioning agent code..."})
+
+    # Create required directories (world-writable so agent process can write)
+    await asyncio.to_thread(
+        sandbox.commands.run,
+        "mkdir -p /agent /comms /output/images /workspace && chmod 777 /agent /comms /output /output/images /workspace",
+        user="root",
+    )
+
+    # Upload each agent source file
+    for src_file in _AGENT_SRC_DIR.iterdir():
+        if src_file.is_file():
+            content = src_file.read_text()
+            await asyncio.to_thread(sandbox.files.write, f"/agent/{src_file.name}", content)
+
+    # Set git identity for portfolio commits
+    await asyncio.to_thread(
+        sandbox.commands.run,
+        'git config --global user.name "DevShowcase Agent" && '
+        'git config --global user.email "agent@devshowcase.app"',
+    )
+
+    # Install Python deps (no-op if already in template)
+    dep_result = await asyncio.to_thread(
+        sandbox.commands.run,
+        "pip3 install -q google-genai httpx",
+    )
+    if dep_result.exit_code != 0:
+        logger.warning("pip install failed (exit %d): %s", dep_result.exit_code, dep_result.stderr)
 
 
 _STAGE_TO_STATUS: dict[str, RunStatus] = {
@@ -73,6 +114,9 @@ async def start_agent_run(run_id: uuid.UUID, user_id: uuid.UUID, repo_url: str) 
                 "stream_url": stream_url,
             })
 
+        # Upload agent code and install deps (works with any template)
+        await _provision_agent(sandbox, queue)
+
         # Write mission file
         mission = {
             "repo_url": repo_url,
@@ -85,13 +129,37 @@ async def start_agent_run(run_id: uuid.UUID, user_id: uuid.UUID, repo_url: str) 
             sandbox.files.write, "/comms/mission.json", json.dumps(mission)
         )
 
-        # Start the agent process
-        await asyncio.to_thread(
-            sandbox.commands.run, "python3 /agent/main.py", background=True
-        )
+        # Launch agent in a separate task (not background=True which is unreliable)
+        async def _run_agent() -> None:
+            try:
+                result = await asyncio.to_thread(
+                    sandbox.commands.run,
+                    "cd /agent && python3 main.py 2>&1 | tee /comms/agent.log",
+                )
+                logger.info("Agent process exited %d", result.exit_code)
+            except CommandExitException as exc:
+                logger.error("Agent process failed: %s", exc)
+            except Exception:
+                logger.exception("Agent process crashed")
 
-        # Monitor the agent
+        agent_task = asyncio.create_task(_run_agent())
+
+        # Best-effort visible terminal for desktop stream
+        try:
+            await asyncio.to_thread(
+                sandbox.commands.run,
+                'DISPLAY=:0 xterm -T "DevShowcase Agent" -fa Monospace -fs 13 '
+                '-bg black -fg white -e "tail -f /comms/agent.log" &',
+                background=True,
+            )
+        except Exception:
+            pass  # Desktop visibility is optional
+
+        # Monitor the agent (runs concurrently with agent_task)
         await _monitor_agent(run_id, sandbox, queue)
+
+        # Cancel the agent task if monitor finished first (e.g., completed/failed)
+        agent_task.cancel()
 
     except Exception as exc:
         logger.exception("Agent run %s failed", run_id)
@@ -110,6 +178,7 @@ async def _monitor_agent(
     rid = str(run_id)
     last_progress_stage = ""
     last_question_id = ""
+    startup_polls = 0
 
     while True:
         await asyncio.sleep(2)
@@ -122,7 +191,46 @@ async def _monitor_agent(
                 )
                 status_data = json.loads(status_raw)
             except Exception:
+                # Agent hasn't written status.json yet — check startup timeout
+                startup_polls += 1
+                elapsed = startup_polls * 2
+
+                # Every 10s, try to read agent.log for early crash diagnostics
+                if elapsed % 10 == 0:
+                    try:
+                        log_content = await asyncio.to_thread(
+                            sandbox.files.read, "/comms/agent.log"
+                        )
+                        if log_content.strip():
+                            logger.info(
+                                "Run %s: agent.log after %ds:\n%s",
+                                run_id, elapsed, log_content[-2000:],
+                            )
+                    except Exception:
+                        logger.info("Run %s: no agent.log after %ds", run_id, elapsed)
+
+                if elapsed > _AGENT_STARTUP_TIMEOUT:
+                    # Try to read agent log for final error context
+                    agent_log = ""
+                    try:
+                        agent_log = await asyncio.to_thread(
+                            sandbox.files.read, "/comms/agent.log"
+                        )
+                    except Exception:
+                        pass
+                    error_msg = "Agent failed to start within timeout"
+                    if agent_log.strip():
+                        # Include last 500 chars of log in error
+                        error_msg += f" — log tail: {agent_log.strip()[-500:]}"
+                    else:
+                        error_msg += " — no agent.log found (process may not have started)"
+                    logger.error("Run %s: %s", run_id, error_msg)
+                    await _update_run_status(run_id, RunStatus.failed, error=error_msg)
+                    queue.put_nowait({"stage": "error", "message": error_msg})
+                    return
                 continue
+
+            startup_polls = 0  # Agent is alive, reset timeout counter
 
             if status_data.get("status") == "completed":
                 # Read final result

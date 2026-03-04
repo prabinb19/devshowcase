@@ -46,7 +46,7 @@ def _do_update(
 
     subprocess.run(
         ["git", "clone", "--depth", "1", clone_url, str(PORTFOLIO_DIR)],
-        check=True, capture_output=True, text=True,
+        check=True, text=True,
     )
 
     project_name = exploration.get("name", "project")
@@ -54,7 +54,7 @@ def _do_update(
 
     subprocess.run(
         ["git", "checkout", "-b", branch],
-        cwd=str(PORTFOLIO_DIR), check=True, capture_output=True, text=True,
+        cwd=str(PORTFOLIO_DIR), check=True, text=True,
     )
 
     # Build project entry
@@ -68,11 +68,11 @@ def _do_update(
     subprocess.run(["git", "add", "-A"], cwd=str(PORTFOLIO_DIR), check=True)
     subprocess.run(
         ["git", "commit", "-m", f"Add project: {project_name}"],
-        cwd=str(PORTFOLIO_DIR), check=True, capture_output=True, text=True,
+        cwd=str(PORTFOLIO_DIR), check=True, text=True,
     )
     subprocess.run(
         ["git", "push", "-u", "origin", branch],
-        cwd=str(PORTFOLIO_DIR), check=True, capture_output=True, text=True,
+        cwd=str(PORTFOLIO_DIR), check=True, text=True,
     )
 
     # Create PR via GitHub API

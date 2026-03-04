@@ -1,5 +1,5 @@
-# E2B template metadata for devshowcase-desktop.
+# E2B template metadata for devshowcase-desktop-agent.
 #
 # Build:
-#   e2b template create devshowcase-desktop --dockerfile Dockerfile
-template_name = "devshowcase-desktop"
+#   e2b template create devshowcase-desktop-agent --dockerfile Dockerfile
+template_name = "devshowcase-desktop-agent"

@@ -16,6 +16,20 @@ RUN apt-get update && apt-get install -y software-properties-common \
 RUN npm install -g serve http-server vite
 
 # Pre-install common build deps (native modules, canvas, etc.)
+# Also install xterm for a visible terminal on the desktop
 RUN apt-get update && apt-get install -y \
-    build-essential \
+    build-essential xterm \
     && rm -rf /var/lib/apt/lists/*
+
+# Agent dependencies
+RUN pip3 install google-genai httpx
+
+# Bake agent code into the image
+COPY agent/ /agent/
+
+# Create directories the agent expects
+RUN mkdir -p /comms /output/images /workspace
+
+# Git identity for portfolio commits
+RUN git config --global user.name "DevShowcase Agent" \
+    && git config --global user.email "agent@devshowcase.app"

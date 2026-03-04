@@ -34,7 +34,6 @@ def explore_repo(repo_url: str, github_token: str) -> dict:
     subprocess.run(
         ["git", "clone", "--depth", "1", clone_url, str(REPO_DIR)],
         check=True,
-        capture_output=True,
         text=True,
     )
 
