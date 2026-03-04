@@ -1,5 +1,10 @@
 # DevShowcase
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.12+](https://img.shields.io/badge/Python-3.12+-3776AB.svg)](https://python.org)
+[![Next.js 14](https://img.shields.io/badge/Next.js-14-black.svg)](https://nextjs.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com)
+
 Turn GitHub repos into LinkedIn posts with AI.
 
 DevShowcase takes a public GitHub repository URL, analyzes the codebase using Claude, captures screenshots, and generates a polished LinkedIn post — ready to edit and publish.
@@ -106,8 +111,9 @@ npm run dev
 | Variable | Description |
 |----------|-------------|
 | `DATABASE_URL` | PostgreSQL connection string (asyncpg) |
-| `CHECKPOINT_URL` | PostgreSQL connection string (psycopg3, for LangGraph) |
-| `ANTHROPIC_API_KEY` | Anthropic API key for Claude |
+| `ANTHROPIC_API_KEY` | Anthropic API key for Claude (required) |
+| `ANTHROPIC_MODEL` | Claude model ID (default: `claude-sonnet-4-20250514`) |
+| `CHECKPOINT_URL` | PostgreSQL psycopg3 URL for LangGraph checkpointer (optional) |
 | `GITHUB_TOKEN` | GitHub personal access token (public repo access) |
 | `TOKEN_ENCRYPTION_KEY` | Fernet key for encrypting OAuth tokens |
 | `R2_ACCOUNT_ID` | Cloudflare R2 account ID |
@@ -188,6 +194,10 @@ devshowcase/
 └── CLAUDE.md                # AI assistant instructions
 ```
 
+## Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
 ## License
 
-MIT
+This project is licensed under the [MIT License](LICENSE).

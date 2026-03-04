@@ -13,6 +13,12 @@ build/
 
 # Environment
 .env
+.env.local
+.env.*.local
+
+# Claude Code
+.claude/
+tasks/
 
 # IDE
 .idea/
