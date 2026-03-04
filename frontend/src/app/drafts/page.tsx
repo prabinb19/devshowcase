@@ -11,9 +11,9 @@ import { listDrafts, deleteDraft } from "@/lib/api";
 import type { Draft, DraftStatus } from "@/types";
 
 const STATUS_COLORS: Record<DraftStatus, string> = {
-  draft: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  published: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  archived: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300",
+  draft: "bg-win98-green text-white bevel-outset",
+  published: "bg-win98-navy text-white bevel-outset",
+  archived: "bg-win98-darkgray text-white bevel-outset",
 };
 
 export default function DraftsPage() {
@@ -47,18 +47,18 @@ export default function DraftsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="min-h-screen bg-win98-silver">
       <Navbar />
       <main className="mx-auto max-w-4xl px-4 py-12">
-        <h1 className="mb-8 text-2xl font-bold text-gray-900 dark:text-white">Your Drafts</h1>
+        <h1 className="mb-8 text-2xl font-bold uppercase text-win98-black">Your Drafts</h1>
 
         {error && (
-          <p className="text-center text-red-600">Failed to load drafts.</p>
+          <p className="text-center text-win98-red font-bold">Failed to load drafts.</p>
         )}
 
         {!userId && !error && (
           <div className="text-center">
-            <p className="text-gray-500 dark:text-gray-400">
+            <p className="text-win98-black">
               No drafts found. Create a showcase first to see your drafts here.
             </p>
             <Link href="/dashboard">
@@ -68,12 +68,12 @@ export default function DraftsPage() {
         )}
 
         {userId && !drafts && !error && (
-          <p className="text-center text-gray-500">Loading...</p>
+          <p className="text-center text-win98-black">Loading...</p>
         )}
 
         {drafts && drafts.length === 0 && (
           <div className="text-center">
-            <p className="text-gray-500 dark:text-gray-400">No drafts yet.</p>
+            <p className="text-win98-black">No drafts yet.</p>
             <Link href="/dashboard">
               <Button className="mt-4">Go to Dashboard</Button>
             </Link>
@@ -87,15 +87,15 @@ export default function DraftsPage() {
                 <div className="flex flex-col gap-3">
                   <div className="flex items-start justify-between">
                     <span
-                      className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[draft.status]}`}
+                      className={`inline-block px-2 py-0.5 text-xs font-bold uppercase ${STATUS_COLORS[draft.status]}`}
                     >
                       {draft.status}
                     </span>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-win98-darkgray font-bold">
                       {formatDate(draft.created_at)}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-700 dark:text-gray-300">
+                  <p className="text-sm text-win98-black">
                     {draft.body.length > 120
                       ? draft.body.slice(0, 120) + "..."
                       : draft.body}

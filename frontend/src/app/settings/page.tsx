@@ -109,21 +109,21 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="min-h-screen bg-win98-silver">
       <Navbar />
       <main className="mx-auto max-w-2xl px-4 py-12">
-        <h1 className="mb-8 text-2xl font-bold text-gray-900 dark:text-white">
-          Settings
+        <h1 className="mb-8 text-2xl font-bold uppercase text-win98-black">
+          Control Panel
         </h1>
 
         {error && (
-          <p className="mb-4 text-sm text-red-600">{error}</p>
+          <p className="mb-4 text-sm text-win98-red font-bold">{error}</p>
         )}
 
         {/* Post Preferences */}
         <Card
           header={
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <h2 className="text-lg font-semibold text-white">
               Post Preferences
             </h2>
           }
@@ -131,7 +131,7 @@ export default function SettingsPage() {
         >
           <div className="flex flex-col gap-5">
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label className="mb-2 block text-sm font-bold text-win98-black">
                 Default Tone
               </label>
               <div className="flex flex-wrap gap-2">
@@ -139,10 +139,10 @@ export default function SettingsPage() {
                   <button
                     key={opt.value}
                     onClick={() => setTone(opt.value)}
-                    className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+                    className={`px-3 py-1.5 text-sm font-bold uppercase ${
                       displayTone === opt.value
-                        ? "border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-900/30 dark:text-blue-300"
-                        : "border-gray-300 text-gray-600 hover:border-gray-400 dark:border-gray-600 dark:text-gray-400 dark:hover:border-gray-500"
+                        ? "bevel-pressed bg-win98-silver text-win98-navy"
+                        : "bevel-outset bg-win98-silver text-win98-black hover:text-win98-navy"
                     }`}
                   >
                     {opt.label}
@@ -152,7 +152,7 @@ export default function SettingsPage() {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label className="mb-2 block text-sm font-bold text-win98-black">
                 Default Hashtags
               </label>
               {displayHashtags.length > 0 && (
@@ -160,12 +160,12 @@ export default function SettingsPage() {
                   {displayHashtags.map((tag, idx) => (
                     <span
                       key={idx}
-                      className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                      className="inline-flex items-center gap-1 bevel-inset bg-white px-2.5 py-0.5 text-xs text-win98-black font-bold"
                     >
                       #{tag}
                       <button
                         onClick={() => removeHashtag(idx)}
-                        className="ml-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                        className="ml-0.5 text-win98-red hover:text-win98-black"
                       >
                         x
                       </button>
@@ -177,7 +177,7 @@ export default function SettingsPage() {
                 <input
                   type="text"
                   placeholder="Add hashtag..."
-                  className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                  className="flex-1 bevel-inset bg-white px-3 py-1.5 text-sm text-win98-black focus:outline-dotted focus:outline-2 focus:outline-win98-black"
                   value={hashtagInput}
                   onChange={(e) => setHashtagInput(e.target.value)}
                   onKeyDown={(e) => {
@@ -198,7 +198,7 @@ export default function SettingsPage() {
                 Save Preferences
               </Button>
               {saved && (
-                <span className="text-sm text-green-600 dark:text-green-400">
+                <span className="text-sm text-win98-green font-bold blink">
                   Saved!
                 </span>
               )}
@@ -209,7 +209,7 @@ export default function SettingsPage() {
         {/* LinkedIn Connection */}
         <Card
           header={
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <h2 className="text-lg font-semibold text-white">
               LinkedIn Connection
             </h2>
           }
@@ -217,19 +217,19 @@ export default function SettingsPage() {
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-3">
               <div
-                className={`h-2.5 w-2.5 rounded-full ${
+                className={`h-2.5 w-2.5 ${
                   linkedInStatus?.connected
-                    ? "bg-green-500"
-                    : "bg-gray-300 dark:bg-gray-600"
+                    ? "bg-win98-green"
+                    : "bg-win98-darkgray"
                 }`}
               />
-              <span className="text-sm text-gray-700 dark:text-gray-300">
+              <span className="text-sm text-win98-black font-bold">
                 {linkedInStatus?.connected
                   ? "Connected"
                   : "Not connected"}
               </span>
               {linkedInStatus?.expires_at && (
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-win98-darkgray">
                   Expires{" "}
                   {new Date(linkedInStatus.expires_at).toLocaleDateString()}
                 </span>

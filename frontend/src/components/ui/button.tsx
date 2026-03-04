@@ -11,13 +11,13 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<Variant, string> = {
   primary:
-    "bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500",
+    "bg-win98-silver bevel-outset text-win98-black active:bevel-pressed active:translate-x-px active:translate-y-px",
   secondary:
-    "bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-400 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600",
+    "bg-win98-silver bevel-outset text-win98-black active:bevel-pressed active:translate-x-px active:translate-y-px",
   danger:
-    "bg-red-600 text-white hover:bg-red-700 focus:ring-red-500",
+    "bg-win98-silver bevel-outset text-win98-red active:bevel-pressed active:translate-x-px active:translate-y-px",
   ghost:
-    "bg-transparent text-gray-700 hover:bg-gray-100 focus:ring-gray-400 dark:text-gray-300 dark:hover:bg-gray-800",
+    "bg-transparent text-win98-black hover:bg-win98-silver active:translate-x-px active:translate-y-px",
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -26,7 +26,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         disabled={disabled || loading}
-        className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${variantStyles[variant]} ${className}`}
+        className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-bold uppercase tracking-wide focus:outline-dotted focus:outline-2 focus:outline-win98-black disabled:opacity-50 disabled:cursor-not-allowed ${variantStyles[variant]} ${className}`}
         {...props}
       >
         {loading && (

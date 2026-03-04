@@ -38,7 +38,7 @@ function stageIndex(status: RunStatus): number {
 function StepIcon({ state }: { state: "pending" | "active" | "completed" | "failed" }) {
   if (state === "completed") {
     return (
-      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-green-500">
+      <div className="flex h-6 w-6 items-center justify-center bg-win98-green">
         <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
         </svg>
@@ -46,18 +46,18 @@ function StepIcon({ state }: { state: "pending" | "active" | "completed" | "fail
     );
   }
   if (state === "active") {
-    return <div className="stepper-active h-6 w-6 rounded-full bg-blue-500" />;
+    return <div className="pulse-glow h-6 w-6 bg-win98-yellow" />;
   }
   if (state === "failed") {
     return (
-      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-red-500">
+      <div className="flex h-6 w-6 items-center justify-center bg-win98-red">
         <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
         </svg>
       </div>
     );
   }
-  return <div className="h-6 w-6 rounded-full border-2 border-gray-300 dark:border-gray-600" />;
+  return <div className="h-6 w-6 border-2 border-win98-darkgray bg-win98-silver" />;
 }
 
 function QuestionDialog({
@@ -84,40 +84,40 @@ function QuestionDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-lg dark:bg-gray-900">
-        <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
-          Agent Question
-        </h3>
-        <p className="mb-4 text-sm text-gray-700 dark:text-gray-300">{question.text}</p>
+      <div className="mx-4 w-full max-w-md bg-win98-silver bevel-outset p-1">
+        <div className="win98-titlebar mb-1">Agent Question</div>
+        <div className="bevel-inset bg-white p-4">
+          <p className="mb-4 text-sm text-win98-black">{question.text}</p>
 
-        {question.options && question.options.length > 0 ? (
-          <div className="flex flex-col gap-2">
-            {question.options.map((opt) => (
-              <Button
-                key={opt}
-                variant="secondary"
-                loading={sending}
-                onClick={() => handleSubmit(opt)}
-                className="justify-start text-left"
-              >
-                {opt}
+          {question.options && question.options.length > 0 ? (
+            <div className="flex flex-col gap-2">
+              {question.options.map((opt) => (
+                <Button
+                  key={opt}
+                  variant="secondary"
+                  loading={sending}
+                  onClick={() => handleSubmit(opt)}
+                  className="justify-start text-left"
+                >
+                  {opt}
+                </Button>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <textarea
+                rows={3}
+                className="w-full bevel-inset bg-white px-3 py-2 text-sm text-win98-black focus:outline-dotted focus:outline-2 focus:outline-win98-black"
+                placeholder="Type your answer..."
+                value={answer}
+                onChange={(e) => setAnswer(e.target.value)}
+              />
+              <Button loading={sending} onClick={() => handleSubmit(answer)} disabled={!answer.trim()}>
+                Send Answer
               </Button>
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            <textarea
-              rows={3}
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-              placeholder="Type your answer..."
-              value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
-            />
-            <Button loading={sending} onClick={() => handleSubmit(answer)} disabled={!answer.trim()}>
-              Send Answer
-            </Button>
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -145,10 +145,10 @@ export default function RunStatusPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="min-h-screen bg-win98-silver">
       <Navbar />
       <main className="mx-auto max-w-xl px-4 py-12">
-        <Card header={<h2 className="text-lg font-semibold text-gray-900 dark:text-white">Agent Status</h2>}>
+        <Card header={<h2 className="text-lg font-semibold text-white">Agent Status</h2>}>
           <div className="flex flex-col gap-0">
             {STAGES.map((stage, idx) => {
               let state: "pending" | "active" | "completed" | "failed" = "pending";
@@ -165,18 +165,18 @@ export default function RunStatusPage() {
                   <div className="flex items-center gap-3 py-2">
                     <StepIcon state={state} />
                     <div>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      <p className="text-sm font-bold text-win98-black">
                         {stage.label}
                       </p>
                       {latestMessages[stage.key] && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                        <p className="text-xs text-win98-darkgray">
                           {latestMessages[stage.key]}
                         </p>
                       )}
                     </div>
                   </div>
                   {idx < STAGES.length - 1 && (
-                    <div className="ml-[11px] h-4 w-0.5 bg-gray-200 dark:bg-gray-700" />
+                    <div className="ml-[11px] h-4 w-0.5 bg-win98-darkgray" />
                   )}
                 </div>
               );
@@ -184,12 +184,12 @@ export default function RunStatusPage() {
           </div>
 
           {sseError && (
-            <p className="mt-4 text-sm text-yellow-600">{sseError} (using polling fallback)</p>
+            <p className="mt-4 text-sm text-win98-yellow font-bold">{sseError} (using polling fallback)</p>
           )}
 
           {isFailed && (
             <div className="mt-4">
-              <p className="text-sm text-red-600">
+              <p className="text-sm text-win98-red font-bold">
                 {run?.error ?? "Agent failed. Please try again."}
               </p>
               <Button
@@ -215,15 +215,15 @@ export default function RunStatusPage() {
           <Card
             header={
               <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                <span className="text-win98-red font-bold blink">LIVE</span>
+                <h2 className="text-lg font-semibold text-white">
                   Live Sandbox View
                 </h2>
               </div>
             }
             className="mt-6"
           >
-            <div className="relative w-full overflow-hidden rounded-lg" style={{ aspectRatio: "16/10" }}>
+            <div className="relative w-full overflow-hidden" style={{ aspectRatio: "16/10" }}>
               <iframe
                 src={streamUrl}
                 className="absolute inset-0 h-full w-full border-0"
@@ -232,7 +232,7 @@ export default function RunStatusPage() {
                 title="Agent sandbox live stream"
               />
             </div>
-            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            <p className="mt-2 text-xs text-win98-darkgray">
               Watching the AI agent work in real time. View only.
             </p>
           </Card>

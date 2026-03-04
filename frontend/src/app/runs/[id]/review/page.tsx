@@ -43,7 +43,7 @@ export default function ReviewPage() {
   useEffect(() => {
     if (!draft) return;
     if (draft.screenshot_urls.length > 0) {
-      setSelectedScreenshots(new Set(draft.screenshot_urls.map((_, i) => i)));
+      setSelectedScreenshots(new Set(draft.screenshot_urls.map((_: string, i: number) => i)));
       setAltTexts(draft.alt_texts ?? draft.screenshot_urls.map(() => ""));
     }
   }, [draft]);
@@ -81,8 +81,8 @@ export default function ReviewPage() {
     setSaving(true);
     setError(null);
     try {
-      const selectedUrls = draft?.screenshot_urls.filter((_, i) => selectedScreenshots.has(i)) ?? [];
-      const selectedAlts = displayAltTexts.filter((_, i) => selectedScreenshots.has(i));
+      const selectedUrls = draft?.screenshot_urls.filter((_: string, i: number) => selectedScreenshots.has(i)) ?? [];
+      const selectedAlts = displayAltTexts.filter((_: string, i: number) => selectedScreenshots.has(i));
 
       await createDraft({
         run_id: run.id,
@@ -121,8 +121,8 @@ export default function ReviewPage() {
       }
 
       // Save as draft first
-      const selectedUrls = draft?.screenshot_urls.filter((_, i) => selectedScreenshots.has(i)) ?? [];
-      const selectedAlts = displayAltTexts.filter((_, i) => selectedScreenshots.has(i));
+      const selectedUrls = draft?.screenshot_urls.filter((_: string, i: number) => selectedScreenshots.has(i)) ?? [];
+      const selectedAlts = displayAltTexts.filter((_: string, i: number) => selectedScreenshots.has(i));
 
       const savedDraft = await createDraft({
         run_id: run.id,
@@ -160,10 +160,10 @@ export default function ReviewPage() {
 
   if (fetchError) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      <div className="min-h-screen bg-win98-silver">
         <Navbar />
         <main className="mx-auto max-w-5xl px-4 py-12">
-          <p className="text-center text-red-600">Failed to load run details.</p>
+          <p className="text-center text-win98-red font-bold">Failed to load run details.</p>
         </main>
       </div>
     );
@@ -171,10 +171,10 @@ export default function ReviewPage() {
 
   if (!run) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      <div className="min-h-screen bg-win98-silver">
         <Navbar />
         <main className="mx-auto max-w-5xl px-4 py-12">
-          <p className="text-center text-gray-500">Loading...</p>
+          <p className="text-center text-win98-black">Loading...</p>
         </main>
       </div>
     );
@@ -182,43 +182,43 @@ export default function ReviewPage() {
 
   if (!draft) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      <div className="min-h-screen bg-win98-silver">
         <Navbar />
         <main className="mx-auto max-w-5xl px-4 py-12">
-          <p className="text-center text-gray-500">No post draft available for this run.</p>
+          <p className="text-center text-win98-black">No post draft available for this run.</p>
         </main>
       </div>
     );
   }
 
-  const selectedUrls = draft.screenshot_urls.filter((_, i) => selectedScreenshots.has(i));
+  const selectedUrls = draft.screenshot_urls.filter((_: string, i: number) => selectedScreenshots.has(i));
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="min-h-screen bg-win98-silver">
       <Navbar />
       <main className="mx-auto max-w-5xl px-4 py-6 sm:py-8">
         <div className="grid gap-6 sm:gap-8 lg:grid-cols-2">
           {/* Left Column - Editor */}
           <div className="flex flex-col gap-6">
-            <Card header={<h2 className="text-lg font-semibold text-gray-900 dark:text-white">Edit Post</h2>}>
+            <Card header={<h2 className="text-lg font-semibold text-white">Edit Post</h2>}>
               <div className="flex flex-col gap-4">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <label className="mb-1 block text-sm font-bold text-win98-black">
                     Post Body
                   </label>
                   <textarea
                     rows={8}
-                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                    className="w-full bevel-inset bg-white px-3 py-2 text-sm text-win98-black focus:outline-dotted focus:outline-2 focus:outline-win98-black"
                     value={displayBody}
                     onChange={(e) => setBody(e.target.value)}
                   />
                   <p
-                    className={`mt-1 text-xs ${
+                    className={`mt-1 text-xs font-bold ${
                       charCount >= 3000
-                        ? "text-red-600"
+                        ? "text-win98-red"
                         : charCount >= 2700
-                          ? "text-yellow-600"
-                          : "text-gray-500"
+                          ? "text-win98-yellow"
+                          : "text-win98-darkgray"
                     }`}
                   >
                     {charCount}/3000
@@ -226,12 +226,12 @@ export default function ReviewPage() {
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <label className="mb-1 block text-sm font-bold text-win98-black">
                     First Comment
                   </label>
                   <textarea
                     rows={3}
-                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                    className="w-full bevel-inset bg-white px-3 py-2 text-sm text-win98-black focus:outline-dotted focus:outline-2 focus:outline-win98-black"
                     value={displayComment}
                     onChange={(e) => setFirstComment(e.target.value)}
                   />
@@ -239,22 +239,21 @@ export default function ReviewPage() {
 
                 {draft.screenshot_urls.length > 0 && (
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label className="mb-2 block text-sm font-bold text-win98-black">
                       Screenshots
                     </label>
                     <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
-                      {draft.screenshot_urls.map((url, idx) => (
-                        <div key={idx} className="flex flex-col gap-2 rounded-lg border border-gray-200 p-2 sm:p-3 dark:border-gray-700">
+                      {draft.screenshot_urls.map((url: string, idx: number) => (
+                        <div key={idx} className="flex flex-col gap-2 bevel-inset p-2 sm:p-3">
                           <label className="flex items-center gap-2">
                             <input
                               type="checkbox"
                               checked={selectedScreenshots.has(idx)}
                               onChange={() => toggleScreenshot(idx)}
-                              className="rounded"
                             />
-                            <span className="text-xs text-gray-500">Include</span>
+                            <span className="text-xs text-win98-black font-bold">Include</span>
                           </label>
-                          <div className="relative aspect-video w-full overflow-hidden rounded">
+                          <div className="relative aspect-video w-full overflow-hidden">
                             <Image
                               src={url}
                               alt={displayAltTexts[idx] ?? `Screenshot ${idx + 1}`}
@@ -265,7 +264,7 @@ export default function ReviewPage() {
                           <input
                             type="text"
                             placeholder="Alt text"
-                            className="w-full rounded border border-gray-300 px-2 py-1 text-xs dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                            className="w-full bevel-inset bg-white px-2 py-1 text-xs text-win98-black"
                             value={displayAltTexts[idx] ?? ""}
                             onChange={(e) => updateAltText(idx, e.target.value)}
                           />
@@ -280,32 +279,33 @@ export default function ReviewPage() {
 
           {/* Right Column - Preview */}
           <div>
-            <Card header={<h2 className="text-lg font-semibold text-gray-900 dark:text-white">LinkedIn Preview</h2>}>
+            <Card header={<h2 className="text-lg font-semibold text-white">LinkedIn Preview</h2>}>
               <div className="flex flex-col gap-3">
                 <div className="flex items-center gap-3">
                   {user?.image && (
-                    <Image
-                      src={user.image}
-                      alt={user.name ?? "Avatar"}
-                      width={40}
-                      height={40}
-                      className="rounded-full"
-                    />
+                    <div className="bevel-inset p-0.5">
+                      <Image
+                        src={user.image}
+                        alt={user.name ?? "Avatar"}
+                        width={40}
+                        height={40}
+                      />
+                    </div>
                   )}
                   <div>
-                    <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                    <p className="text-sm font-bold text-win98-black">
                       {user?.name ?? user?.githubUsername ?? "You"}
                     </p>
-                    <p className="text-xs text-gray-500">Just now</p>
+                    <p className="text-xs text-win98-darkgray">Just now</p>
                   </div>
                 </div>
 
-                <p className="whitespace-pre-wrap text-sm text-gray-800 dark:text-gray-200">
+                <p className="whitespace-pre-wrap text-sm text-win98-black">
                   {displayBody}
                 </p>
 
                 {selectedUrls.length > 0 && (
-                  <div className="relative aspect-video w-full overflow-hidden rounded-lg">
+                  <div className="relative aspect-video w-full overflow-hidden bevel-inset">
                     <Image
                       src={selectedUrls[0]}
                       alt="Post image"
@@ -315,9 +315,9 @@ export default function ReviewPage() {
                   </div>
                 )}
 
-                <div className="flex justify-between border-t border-gray-200 pt-3 dark:border-gray-700">
+                <div className="flex justify-between groove-hr pt-3">
                   {["Like", "Comment", "Repost", "Send"].map((action) => (
-                    <span key={action} className="text-xs text-gray-500">
+                    <span key={action} className="text-xs text-win98-darkgray uppercase font-bold">
                       {action}
                     </span>
                   ))}
@@ -341,14 +341,14 @@ export default function ReviewPage() {
             </Button>
           </div>
           {(error || publishError) && (
-            <p className="text-sm text-red-600">{error || publishError}</p>
+            <p className="text-sm text-win98-red font-bold">{error || publishError}</p>
           )}
           {run?.agent_output?.portfolio_pr_url && (
             <a
               href={run.agent_output.portfolio_pr_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+              className="text-sm text-win98-blue hover:text-win98-red"
             >
               View Portfolio PR
             </a>

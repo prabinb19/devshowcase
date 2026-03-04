@@ -46,10 +46,10 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="min-h-screen bg-win98-silver">
       <Navbar />
       <main className="mx-auto max-w-2xl px-4 py-12">
-        <Card header={<h2 className="text-lg font-semibold text-gray-900 dark:text-white">New Showcase</h2>}>
+        <Card header={<h2 className="text-lg font-semibold text-white">New Showcase</h2>}>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <Input
               label="Repository URL"

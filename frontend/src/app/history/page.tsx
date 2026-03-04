@@ -35,20 +35,20 @@ export default function HistoryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="min-h-screen bg-win98-silver">
       <Navbar />
       <main className="mx-auto max-w-4xl px-4 py-12">
-        <h1 className="mb-8 text-2xl font-bold text-gray-900 dark:text-white">
+        <h1 className="mb-8 text-2xl font-bold uppercase text-win98-black">
           Published Posts
         </h1>
 
         {error && (
-          <p className="text-center text-red-600">Failed to load history.</p>
+          <p className="text-center text-win98-red font-bold">Failed to load history.</p>
         )}
 
         {!userId && !error && (
           <div className="text-center">
-            <p className="text-gray-500 dark:text-gray-400">
+            <p className="text-win98-black">
               No published posts found. Create and publish a showcase first.
             </p>
             <Link href="/dashboard">
@@ -58,12 +58,12 @@ export default function HistoryPage() {
         )}
 
         {userId && !drafts && !error && (
-          <p className="text-center text-gray-500">Loading...</p>
+          <p className="text-center text-win98-black">Loading...</p>
         )}
 
         {drafts && drafts.length === 0 && (
           <div className="text-center">
-            <p className="text-gray-500 dark:text-gray-400">
+            <p className="text-win98-black">
               No published posts yet.
             </p>
             <Link href="/dashboard">
@@ -78,16 +78,16 @@ export default function HistoryPage() {
               <Card key={draft.id}>
                 <div className="flex flex-col gap-3">
                   <div className="flex items-start justify-between">
-                    <span className="inline-block rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                    <span className="inline-block bg-win98-navy text-white bevel-outset px-2 py-0.5 text-xs font-bold uppercase">
                       Published
                     </span>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-win98-darkgray font-bold">
                       {draft.published_at
                         ? formatDate(draft.published_at)
                         : formatDate(draft.created_at)}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-700 dark:text-gray-300">
+                  <p className="text-sm text-win98-black">
                     {draft.body.length > 120
                       ? draft.body.slice(0, 120) + "..."
                       : draft.body}
@@ -98,7 +98,7 @@ export default function HistoryPage() {
                         href={draft.published_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                        className="text-sm font-bold text-win98-blue hover:text-win98-red"
                       >
                         View on LinkedIn
                       </a>
