@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import pytest_asyncio
@@ -11,6 +11,8 @@ from httpx import ASGITransport, AsyncClient
 
 from app.database import get_session
 from app.models import Draft, DraftStatus
+from app.routes.deps import verify_auth
+from tests.conftest import make_fake_auth
 
 
 def _make_mock_session(
@@ -73,6 +75,7 @@ async def test_create_draft(
 
     draft_id = uuid.uuid4()
     now = datetime.now(timezone.utc)
+    fake_auth = make_fake_auth(user_id=user_id)
     session = _make_mock_session()
     session.refresh = AsyncMock(
         side_effect=lambda draft: (
@@ -88,6 +91,7 @@ async def test_create_draft(
         yield session
 
     app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[verify_auth] = lambda: fake_auth
     try:
         response = await client.post(
             "/api/drafts",
@@ -109,8 +113,10 @@ async def test_create_draft(
 async def test_list_drafts(
     client: AsyncClient, user_id: uuid.UUID, sample_draft: Draft
 ):
-    """GET /api/drafts?user_id=... returns drafts for that user."""
+    """GET /api/drafts returns drafts for the authenticated user."""
     from app.main import app
+
+    fake_auth = make_fake_auth(user_id=user_id)
 
     result_mock = MagicMock()
     scalars_mock = MagicMock()
@@ -122,10 +128,9 @@ async def test_list_drafts(
         yield session
 
     app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[verify_auth] = lambda: fake_auth
     try:
-        response = await client.get(
-            f"/api/drafts?user_id={user_id}"
-        )
+        response = await client.get("/api/drafts")
     finally:
         app.dependency_overrides.clear()
 
@@ -136,10 +141,12 @@ async def test_list_drafts(
 
 
 async def test_get_draft_found(
-    client: AsyncClient, sample_draft: Draft
+    client: AsyncClient, user_id: uuid.UUID, sample_draft: Draft
 ):
     """GET /api/drafts/{id} returns draft data for a known draft."""
     from app.main import app
+
+    fake_auth = make_fake_auth(user_id=user_id)
 
     result_mock = MagicMock()
     result_mock.scalar_one_or_none.return_value = sample_draft
@@ -149,6 +156,7 @@ async def test_get_draft_found(
         yield session
 
     app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[verify_auth] = lambda: fake_auth
     try:
         response = await client.get(f"/api/drafts/{sample_draft.id}")
     finally:
@@ -163,6 +171,8 @@ async def test_get_draft_not_found(client: AsyncClient):
     """GET /api/drafts/{id} returns 404 for unknown draft."""
     from app.main import app
 
+    fake_auth = make_fake_auth()
+
     result_mock = MagicMock()
     result_mock.scalar_one_or_none.return_value = None
     session = _make_mock_session(execute_return=result_mock)
@@ -171,6 +181,7 @@ async def test_get_draft_not_found(client: AsyncClient):
         yield session
 
     app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[verify_auth] = lambda: fake_auth
     try:
         response = await client.get(f"/api/drafts/{uuid.uuid4()}")
     finally:
@@ -180,10 +191,12 @@ async def test_get_draft_not_found(client: AsyncClient):
 
 
 async def test_update_draft(
-    client: AsyncClient, sample_draft: Draft
+    client: AsyncClient, user_id: uuid.UUID, sample_draft: Draft
 ):
     """PATCH /api/drafts/{id} updates fields."""
     from app.main import app
+
+    fake_auth = make_fake_auth(user_id=user_id)
 
     result_mock = MagicMock()
     result_mock.scalar_one_or_none.return_value = sample_draft
@@ -196,6 +209,7 @@ async def test_update_draft(
         yield session
 
     app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[verify_auth] = lambda: fake_auth
     try:
         response = await client.patch(
             f"/api/drafts/{sample_draft.id}",
@@ -213,6 +227,8 @@ async def test_update_draft_not_found(client: AsyncClient):
     """PATCH /api/drafts/{id} returns 404 for unknown draft."""
     from app.main import app
 
+    fake_auth = make_fake_auth()
+
     result_mock = MagicMock()
     result_mock.scalar_one_or_none.return_value = None
     session = _make_mock_session(execute_return=result_mock)
@@ -221,6 +237,7 @@ async def test_update_draft_not_found(client: AsyncClient):
         yield session
 
     app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[verify_auth] = lambda: fake_auth
     try:
         response = await client.patch(
             f"/api/drafts/{uuid.uuid4()}",
@@ -233,10 +250,12 @@ async def test_update_draft_not_found(client: AsyncClient):
 
 
 async def test_delete_draft(
-    client: AsyncClient, sample_draft: Draft
+    client: AsyncClient, user_id: uuid.UUID, sample_draft: Draft
 ):
     """DELETE /api/drafts/{id} deletes and returns 204."""
     from app.main import app
+
+    fake_auth = make_fake_auth(user_id=user_id)
 
     result_mock = MagicMock()
     result_mock.scalar_one_or_none.return_value = sample_draft
@@ -246,6 +265,7 @@ async def test_delete_draft(
         yield session
 
     app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[verify_auth] = lambda: fake_auth
     try:
         response = await client.delete(f"/api/drafts/{sample_draft.id}")
     finally:
@@ -258,6 +278,8 @@ async def test_delete_draft_not_found(client: AsyncClient):
     """DELETE /api/drafts/{id} returns 404 for unknown draft."""
     from app.main import app
 
+    fake_auth = make_fake_auth()
+
     result_mock = MagicMock()
     result_mock.scalar_one_or_none.return_value = None
     session = _make_mock_session(execute_return=result_mock)
@@ -266,6 +288,7 @@ async def test_delete_draft_not_found(client: AsyncClient):
         yield session
 
     app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[verify_auth] = lambda: fake_auth
     try:
         response = await client.delete(f"/api/drafts/{uuid.uuid4()}")
     finally:

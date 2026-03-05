@@ -10,6 +10,8 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 from app.database import get_session
+from app.routes.deps import verify_auth
+from tests.conftest import make_fake_auth
 
 
 def _make_mock_session(*, execute_return=None) -> AsyncMock:
@@ -23,10 +25,10 @@ def _make_mock_session(*, execute_return=None) -> AsyncMock:
     return session
 
 
-def _make_user(*, preferences: dict | None = None) -> MagicMock:
+def _make_user(*, preferences: dict | None = None, user_id: uuid.UUID | None = None) -> MagicMock:
     """Create a mock User with optional preferences."""
     user = MagicMock()
-    user.id = uuid.uuid4()
+    user.id = user_id or uuid.uuid4()
     user.github_id = "12345"
     user.github_username = "testuser"
     user.preferences = preferences
@@ -44,24 +46,24 @@ async def client():
         yield c
 
 
-HEADERS = {"X-GitHub-Id": "12345", "X-GitHub-Username": "testuser"}
-
-
 async def test_get_settings_defaults(client: AsyncClient):
     """GET /api/settings returns defaults when user has no preferences."""
     from app.main import app
 
-    user = _make_user(preferences=None)
-    result_mock = MagicMock()
-    result_mock.scalar_one_or_none.return_value = user
-    session = _make_mock_session(execute_return=result_mock)
+    uid = uuid.uuid4()
+    user = _make_user(preferences=None, user_id=uid)
+    fake_auth = make_fake_auth(user_id=uid)
+    fake_auth.db_user = user
+
+    session = _make_mock_session()
 
     async def override_session():
         yield session
 
     app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[verify_auth] = lambda: fake_auth
     try:
-        response = await client.get("/api/settings", headers=HEADERS)
+        response = await client.get("/api/settings")
     finally:
         app.dependency_overrides.clear()
 
@@ -75,20 +77,23 @@ async def test_get_settings_stored(client: AsyncClient):
     """GET /api/settings returns stored preferences."""
     from app.main import app
 
-    user = _make_user(preferences={
-        "default_tone": "casual",
-        "hashtags": ["python", "devops"],
-    })
-    result_mock = MagicMock()
-    result_mock.scalar_one_or_none.return_value = user
-    session = _make_mock_session(execute_return=result_mock)
+    uid = uuid.uuid4()
+    user = _make_user(
+        preferences={"default_tone": "casual", "hashtags": ["python", "devops"]},
+        user_id=uid,
+    )
+    fake_auth = make_fake_auth(user_id=uid)
+    fake_auth.db_user = user
+
+    session = _make_mock_session()
 
     async def override_session():
         yield session
 
     app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[verify_auth] = lambda: fake_auth
     try:
-        response = await client.get("/api/settings", headers=HEADERS)
+        response = await client.get("/api/settings")
     finally:
         app.dependency_overrides.clear()
 
@@ -102,10 +107,12 @@ async def test_put_settings_updates(client: AsyncClient):
     """PUT /api/settings updates and returns new preferences."""
     from app.main import app
 
-    user = _make_user(preferences=None)
-    result_mock = MagicMock()
-    result_mock.scalar_one_or_none.return_value = user
-    session = _make_mock_session(execute_return=result_mock)
+    uid = uuid.uuid4()
+    user = _make_user(preferences=None, user_id=uid)
+    fake_auth = make_fake_auth(user_id=uid)
+    fake_auth.db_user = user
+
+    session = _make_mock_session()
 
     # After refresh, user.preferences should reflect the update
     def fake_refresh(obj):
@@ -120,10 +127,10 @@ async def test_put_settings_updates(client: AsyncClient):
         yield session
 
     app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[verify_auth] = lambda: fake_auth
     try:
         response = await client.put(
             "/api/settings",
-            headers=HEADERS,
             json={"default_tone": "technical", "hashtags": ["ai"]},
         )
     finally:
@@ -140,19 +147,18 @@ async def test_put_settings_invalid_tone(client: AsyncClient):
     """PUT /api/settings with invalid tone returns 422."""
     from app.main import app
 
-    user = _make_user()
-    result_mock = MagicMock()
-    result_mock.scalar_one_or_none.return_value = user
-    session = _make_mock_session(execute_return=result_mock)
+    fake_auth = make_fake_auth()
+
+    session = _make_mock_session()
 
     async def override_session():
         yield session
 
     app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[verify_auth] = lambda: fake_auth
     try:
         response = await client.put(
             "/api/settings",
-            headers=HEADERS,
             json={"default_tone": "sarcastic", "hashtags": []},
         )
     finally:
@@ -162,6 +168,6 @@ async def test_put_settings_invalid_tone(client: AsyncClient):
 
 
 async def test_get_settings_missing_auth(client: AsyncClient):
-    """GET /api/settings without required header returns 422."""
+    """GET /api/settings without authorization returns 401."""
     response = await client.get("/api/settings")
-    assert response.status_code == 422
+    assert response.status_code == 401

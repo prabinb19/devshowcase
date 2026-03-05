@@ -6,12 +6,15 @@ import uuid
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import jwt
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 from app.database import get_session
 from app.models import Run, RunStatus, User
+from app.routes.deps import verify_auth
+from tests.conftest import make_fake_auth
 
 
 @pytest.fixture
@@ -87,18 +90,9 @@ async def test_create_run_returns_202(
     from app.main import app
 
     run_id = uuid.uuid4()
-    fake_user = User(
-        id=user_id,
-        github_id=github_id,
-        github_username=github_username,
-    )
+    fake_auth = make_fake_auth(github_id=github_id, github_username=github_username, user_id=user_id)
 
     session = _make_mock_session()
-
-    # First execute call is for get_or_create_user (select User)
-    user_result = MagicMock()
-    user_result.scalar_one_or_none.return_value = fake_user
-    session.execute = AsyncMock(return_value=user_result)
 
     def _refresh_side_effect(obj):
         if isinstance(obj, Run):
@@ -110,14 +104,11 @@ async def test_create_run_returns_202(
         yield session
 
     app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[verify_auth] = lambda: fake_auth
     try:
         response = await client.post(
             "/api/runs",
             json={"repo_url": "https://github.com/test/repo"},
-            headers={
-                "X-GitHub-Id": github_id,
-                "X-GitHub-Username": github_username,
-            },
         )
     finally:
         app.dependency_overrides.clear()
@@ -132,6 +123,8 @@ async def test_get_run_not_found(client: AsyncClient):
     """GET /api/runs/{id} returns 404 for unknown run."""
     from app.main import app
 
+    fake_auth = make_fake_auth()
+
     result_mock = MagicMock()
     result_mock.scalar_one_or_none.return_value = None
     session = _make_mock_session(execute_return=result_mock)
@@ -140,6 +133,7 @@ async def test_get_run_not_found(client: AsyncClient):
         yield session
 
     app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[verify_auth] = lambda: fake_auth
     try:
         response = await client.get(f"/api/runs/{uuid.uuid4()}")
     finally:
@@ -148,9 +142,11 @@ async def test_get_run_not_found(client: AsyncClient):
     assert response.status_code == 404
 
 
-async def test_get_run_found(client: AsyncClient, sample_run: Run):
+async def test_get_run_found(client: AsyncClient, user_id: uuid.UUID, sample_run: Run):
     """GET /api/runs/{id} returns run data for a known run."""
     from app.main import app
+
+    fake_auth = make_fake_auth(user_id=user_id)
 
     result_mock = MagicMock()
     result_mock.scalar_one_or_none.return_value = sample_run
@@ -160,6 +156,7 @@ async def test_get_run_found(client: AsyncClient, sample_run: Run):
         yield session
 
     app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[verify_auth] = lambda: fake_auth
     try:
         response = await client.get(f"/api/runs/{sample_run.id}")
     finally:
@@ -175,9 +172,22 @@ async def test_rate_limit_returns_429(
     client: AsyncClient, github_id: str
 ):
     """POST /api/runs returns 429 after rate limit is exceeded."""
-    with patch(
-        "app.middleware.rate_limit.async_session"
-    ) as mock_session_factory:
+    # Build a valid JWT so the rate limiter middleware can extract github_id
+    test_secret = "test-secret-for-rate-limit"
+
+    token = jwt.encode(
+        {"githubId": github_id, "githubUsername": "testuser"},
+        test_secret,
+        algorithm="HS256",
+    )
+
+    with (
+        patch("app.middleware.rate_limit.settings") as mock_rl_settings,
+        patch("app.middleware.rate_limit.async_session") as mock_session_factory,
+    ):
+        mock_rl_settings.nextauth_secret = test_secret
+        mock_rl_settings.rate_limit_runs_per_hour = 10
+
         session = AsyncMock()
 
         # First execute: select User.id -> returns a UUID
@@ -196,10 +206,7 @@ async def test_rate_limit_returns_429(
         response = await client.post(
             "/api/runs",
             json={"repo_url": "https://github.com/test/repo"},
-            headers={
-                "X-GitHub-Id": github_id,
-                "X-GitHub-Username": "testuser",
-            },
+            headers={"Authorization": f"Bearer {token}"},
         )
 
     assert response.status_code == 429

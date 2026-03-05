@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 
+import jwt
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
@@ -13,9 +15,11 @@ from app.config import settings
 from app.database import async_session
 from app.models import Run
 
+logger = logging.getLogger(__name__)
+
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
-    """Limits POST /api/runs to N per hour per user (via X-GitHub-Id header)."""
+    """Limits POST /api/runs to N per hour per user (via JWT Authorization header)."""
 
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
@@ -23,7 +27,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if request.method != "POST" or request.url.path != "/api/runs":
             return await call_next(request)
 
-        github_id = request.headers.get("X-GitHub-Id")
+        # Extract github_id from JWT instead of trusting raw header
+        github_id = self._extract_github_id(request)
         if not github_id:
             return await call_next(request)
 
@@ -57,3 +62,20 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             )
 
         return await call_next(request)
+
+    @staticmethod
+    def _extract_github_id(request: Request) -> str | None:
+        """Extract github_id from JWT in Authorization header."""
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return None
+
+        token = auth_header.removeprefix("Bearer ").strip()
+        if not token or not settings.nextauth_secret:
+            return None
+
+        try:
+            payload = jwt.decode(token, settings.nextauth_secret, algorithms=["HS256"])
+            return str(payload.get("githubId") or payload.get("github_id") or "")
+        except jwt.InvalidTokenError:
+            return None

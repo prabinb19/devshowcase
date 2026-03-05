@@ -7,7 +7,7 @@ import json
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,7 +15,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.database import get_session
 from app.models import Run, RunStatus
-from app.routes.deps import get_or_create_user
+from app.routes.deps import AuthenticatedUser, verify_auth
 from app.schemas.runs import CreateRunRequest, RunDetailResponse, RunResponse
 from app.services.agent_executor import get_event_queue, start_agent_run, submit_answer
 
@@ -40,12 +40,11 @@ def _track_task(task: asyncio.Task) -> None:
 @router.post("", status_code=202, response_model=RunResponse)
 async def create_run(
     body: CreateRunRequest,
+    auth: AuthenticatedUser = Depends(verify_auth),
     session: AsyncSession = Depends(get_session),
-    x_github_id: str = Header(..., alias="X-GitHub-Id"),
-    x_github_username: str = Header(..., alias="X-GitHub-Username"),
 ) -> RunResponse:
     """Create a new agent run for the given repository URL."""
-    user = await get_or_create_user(x_github_id, x_github_username, session)
+    user = auth.db_user
 
     run = Run(
         user_id=user.id,
@@ -65,6 +64,7 @@ async def create_run(
 @router.get("/{run_id}", response_model=RunDetailResponse)
 async def get_run(
     run_id: uuid.UUID,
+    auth: AuthenticatedUser = Depends(verify_auth),
     session: AsyncSession = Depends(get_session),
 ) -> RunDetailResponse:
     """Get the current status and results of a run."""
@@ -72,6 +72,8 @@ async def get_run(
     run = result.scalar_one_or_none()
     if not run:
         raise HTTPException(404, "Run not found")
+    if run.user_id != auth.db_user.id:
+        raise HTTPException(403, "Not authorized to access this run")
     return RunDetailResponse.model_validate(run)
 
 
@@ -83,14 +85,27 @@ class AgentAnswer(BaseModel):
 async def answer_agent_question(
     run_id: uuid.UUID,
     body: AgentAnswer,
+    auth: AuthenticatedUser = Depends(verify_auth),
+    session: AsyncSession = Depends(get_session),
 ) -> None:
     """Submit an answer to an agent's question."""
+    result = await session.execute(select(Run).where(Run.id == run_id))
+    run = result.scalar_one_or_none()
+    if not run:
+        raise HTTPException(404, "Run not found")
+    if run.user_id != auth.db_user.id:
+        raise HTTPException(403, "Not authorized to interact with this run")
     await submit_answer(str(run_id), body.text)
 
 
 @router.get("/{run_id}/stream")
 async def stream_run(run_id: uuid.UUID) -> EventSourceResponse:
-    """SSE stream of agent progress events for a run."""
+    """SSE stream of agent progress events for a run.
+
+    Note: SSE streams are not proxied through the Next.js API route so they
+    remain unauthenticated for now (the stream URL is ephemeral and only
+    returned after an authenticated create_run call).
+    """
     queue = get_event_queue(str(run_id))
 
     async def event_generator():
