@@ -27,12 +27,12 @@ export default function SettingsPage() {
 
   const { data: settings, mutate: mutateSettings } = useSWR(
     user ? `settings-${user.githubId}` : null,
-    () => getUserSettings(user!.githubId, user!.githubUsername)
+    () => getUserSettings()
   );
 
   const { data: linkedInStatus, mutate: mutateLinkedIn } = useSWR(
     user ? `linkedin-status-${user.githubId}` : null,
-    () => getLinkedInStatus(user!.githubId, user!.githubUsername)
+    () => getLinkedInStatus()
   );
 
   const [tone, setTone] = useState<ToneOption | null>(null);
@@ -69,7 +69,7 @@ export default function SettingsPage() {
     setSaved(false);
     setError(null);
     try {
-      await updateUserSettings(user.githubId, user.githubUsername, {
+      await updateUserSettings({
         default_tone: displayTone,
         hashtags: displayHashtags,
       });
@@ -99,7 +99,7 @@ export default function SettingsPage() {
     setDisconnecting(true);
     setError(null);
     try {
-      await disconnectLinkedIn(user.githubId, user.githubUsername);
+      await disconnectLinkedIn();
       mutateLinkedIn();
     } catch {
       setError("Failed to disconnect LinkedIn. Please try again.");

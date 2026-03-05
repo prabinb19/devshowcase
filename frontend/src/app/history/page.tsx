@@ -23,7 +23,7 @@ export default function HistoryPage() {
 
   const { data: drafts, error } = useSWR(
     userId ? `history-${userId}` : null,
-    () => listDraftsByStatus(userId!, "published")
+    () => listDraftsByStatus("published")
   );
 
   function formatDate(dateStr: string): string {

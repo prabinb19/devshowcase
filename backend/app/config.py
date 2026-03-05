@@ -2,6 +2,7 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    nextauth_secret: str = ""
     database_url: str = "postgresql+asyncpg://postgres:dev@localhost:5432/devshowcase"
     github_token: str = ""
     e2b_api_key: str = ""

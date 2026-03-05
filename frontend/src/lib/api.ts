@@ -1,10 +1,20 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+/**
+ * API client — all authenticated calls go through the Next.js proxy at
+ * /api/backend which attaches a signed JWT. SSE streams and unauthenticated
+ * reads still hit the backend directly.
+ */
+
+const DIRECT_API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const PROXY_BASE = "/api/backend";
 
 async function apiFetch<T>(
   path: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  { direct = false }: { direct?: boolean } = {}
 ): Promise<T> {
-  const url = `${API_BASE}${path}`;
+  const base = direct ? DIRECT_API_BASE : PROXY_BASE;
+  const url = `${base}${path}`;
   const res = await fetch(url, {
     ...options,
     headers: {
@@ -20,19 +30,10 @@ async function apiFetch<T>(
   return res.json();
 }
 
-// Runs
-export function createRun(
-  repoUrl: string,
-  githubId: string,
-  githubUsername: string
-) {
+// Runs — authenticated via proxy (no more X-GitHub-* headers)
+export function createRun(repoUrl: string) {
   return apiFetch<{ run_id: string; status: string }>("/api/runs", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-GitHub-Id": githubId,
-      "X-GitHub-Username": githubUsername,
-    },
     body: JSON.stringify({ repo_url: repoUrl }),
   });
 }
@@ -48,11 +49,12 @@ export function answerAgentQuestion(runId: string, text: string) {
   });
 }
 
+// SSE stream URL — direct to backend (not proxied)
 export function getSSEUrl(runId: string) {
-  return `${API_BASE}/api/runs/${runId}/stream`;
+  return `${DIRECT_API_BASE}/api/runs/${runId}/stream`;
 }
 
-// Drafts
+// Drafts — authenticated via proxy
 export function createDraft(data: import("@/types").CreateDraftRequest) {
   return apiFetch<import("@/types").Draft>("/api/drafts", {
     method: "POST",
@@ -60,8 +62,8 @@ export function createDraft(data: import("@/types").CreateDraftRequest) {
   });
 }
 
-export function listDrafts(userId: string) {
-  return apiFetch<import("@/types").Draft[]>(`/api/drafts?user_id=${userId}`);
+export function listDrafts() {
+  return apiFetch<import("@/types").Draft[]>("/api/drafts");
 }
 
 export function getDraft(draftId: string) {
@@ -82,72 +84,40 @@ export function deleteDraft(draftId: string) {
   return apiFetch<void>(`/api/drafts/${draftId}`, { method: "DELETE" });
 }
 
-// LinkedIn
+// LinkedIn — authenticated via proxy
 export function getLinkedInAuthUrl() {
   return apiFetch<{ auth_url: string }>("/api/linkedin/auth-url");
 }
 
-export function getLinkedInStatus(githubId: string, githubUsername: string) {
-  return apiFetch<import("@/types").LinkedInStatus>("/api/linkedin/status", {
-    headers: {
-      "X-GitHub-Id": githubId,
-      "X-GitHub-Username": githubUsername,
-    },
-  });
+export function getLinkedInStatus() {
+  return apiFetch<import("@/types").LinkedInStatus>("/api/linkedin/status");
 }
 
-export function publishToLinkedIn(
-  draftId: string,
-  githubId: string,
-  githubUsername: string
-) {
+export function publishToLinkedIn(draftId: string) {
   return apiFetch<import("@/types").PublishResponse>("/api/linkedin/publish", {
     method: "POST",
-    headers: {
-      "X-GitHub-Id": githubId,
-      "X-GitHub-Username": githubUsername,
-    },
     body: JSON.stringify({ draft_id: draftId }),
   });
 }
 
-export function disconnectLinkedIn(githubId: string, githubUsername: string) {
-  return apiFetch<void>("/api/linkedin/disconnect", {
-    method: "DELETE",
-    headers: {
-      "X-GitHub-Id": githubId,
-      "X-GitHub-Username": githubUsername,
-    },
-  });
+export function disconnectLinkedIn() {
+  return apiFetch<void>("/api/linkedin/disconnect", { method: "DELETE" });
 }
 
-export function listDraftsByStatus(userId: string, status: string) {
+export function listDraftsByStatus(status: string) {
   return apiFetch<import("@/types").Draft[]>(
-    `/api/drafts?user_id=${userId}&status=${status}`
+    `/api/drafts?status=${status}`
   );
 }
 
-// Settings
-export function getUserSettings(githubId: string, githubUsername: string) {
-  return apiFetch<import("@/types").UserSettings>("/api/settings", {
-    headers: {
-      "X-GitHub-Id": githubId,
-      "X-GitHub-Username": githubUsername,
-    },
-  });
+// Settings — authenticated via proxy
+export function getUserSettings() {
+  return apiFetch<import("@/types").UserSettings>("/api/settings");
 }
 
-export function updateUserSettings(
-  githubId: string,
-  githubUsername: string,
-  data: import("@/types").UserSettings
-) {
+export function updateUserSettings(data: import("@/types").UserSettings) {
   return apiFetch<import("@/types").UserSettings>("/api/settings", {
     method: "PUT",
-    headers: {
-      "X-GitHub-Id": githubId,
-      "X-GitHub-Username": githubUsername,
-    },
     body: JSON.stringify(data),
   });
 }

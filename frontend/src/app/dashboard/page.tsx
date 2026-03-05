@@ -37,7 +37,7 @@ export default function DashboardPage() {
 
     setLoading(true);
     try {
-      const data = await createRun(trimmed, user.githubId, user.githubUsername);
+      const data = await createRun(trimmed);
       router.push(`/runs/${data.run_id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create run");

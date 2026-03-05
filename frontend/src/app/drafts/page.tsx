@@ -29,7 +29,7 @@ export default function DraftsPage() {
 
   const { data: drafts, error, mutate } = useSWR(
     userId ? `drafts-${userId}` : null,
-    () => listDrafts(userId!)
+    () => listDrafts()
   );
 
   async function handleDelete(draftId: string) {

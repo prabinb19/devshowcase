@@ -112,7 +112,7 @@ export default function ReviewPage() {
 
     try {
       // Check LinkedIn connection status
-      const status = await getLinkedInStatus(user.githubId, user.githubUsername);
+      const status = await getLinkedInStatus();
       if (!status.connected) {
         // Redirect to LinkedIn OAuth
         const { auth_url } = await getLinkedInAuthUrl();
@@ -134,11 +134,7 @@ export default function ReviewPage() {
       });
 
       // Publish the draft
-      const result = await publishToLinkedIn(
-        savedDraft.id,
-        user.githubId,
-        user.githubUsername
-      );
+      const result = await publishToLinkedIn(savedDraft.id);
 
       if (result.success) {
         router.push("/history");
