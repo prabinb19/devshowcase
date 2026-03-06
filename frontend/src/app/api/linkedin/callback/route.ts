@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getToken } from "next-auth/jwt";
+import * as jose from "jose";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -21,11 +23,32 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Forward the code to the backend — we need the user's GitHub info from the cookie/session
-    // The backend will exchange it for tokens
+    // Read the NextAuth session and build a JWT for the backend
+    const sessionToken = await getToken({ req: request });
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+
+    if (sessionToken) {
+      const secret = process.env.NEXTAUTH_SECRET;
+      if (secret) {
+        const encodedSecret = new TextEncoder().encode(secret);
+        const backendToken = await new jose.SignJWT({
+          githubId: String(sessionToken.githubId ?? ""),
+          githubUsername: String(sessionToken.githubUsername ?? ""),
+        })
+          .setProtectedHeader({ alg: "HS256" })
+          .setIssuedAt()
+          .setExpirationTime("5m")
+          .sign(encodedSecret);
+
+        headers["Authorization"] = `Bearer ${backendToken}`;
+      }
+    }
+
     const res = await fetch(`${API_BASE}/api/linkedin/callback`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ code, state }),
     });
 

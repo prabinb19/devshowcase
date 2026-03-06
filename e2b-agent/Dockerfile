@@ -4,7 +4,7 @@ RUN apt-get update && apt-get install -y \
     python3 python3-pip git curl \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install google-genai httpx
+RUN pip3 install google-genai==1.14.0 httpx==0.28.1
 
 COPY agent/ /agent/
 

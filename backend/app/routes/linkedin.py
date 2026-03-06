@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
+import logging
+import threading
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
 from app.models import Draft, DraftStatus, Token
-from app.routes.deps import get_or_create_user
+from app.routes.deps import AuthenticatedUser, verify_auth
 from app.schemas.linkedin import (
     LinkedInAuthURLResponse,
     LinkedInCallbackRequest,
@@ -28,9 +31,42 @@ from app.services.linkedin_client import (
     refresh_access_token,
     upload_image,
 )
+from app.services.audit_log import log_publish_event, log_token_event
 from app.services.token_encryption import decrypt_token, encrypt_token
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/linkedin", tags=["linkedin"])
+
+# --- OAuth state store (CSRF protection) ---
+_STATE_TTL = 600  # 10 minutes
+_state_lock = threading.Lock()
+_state_store: dict[str, tuple[float, str]] = {}  # state -> (expires_at, github_id)
+
+
+def _store_state(state: str, github_id: str) -> None:
+    """Store an OAuth state value with a TTL and user binding."""
+    with _state_lock:
+        # Prune expired entries
+        now = time.time()
+        expired = [k for k, (exp, _) in _state_store.items() if exp < now]
+        for k in expired:
+            del _state_store[k]
+        _state_store[state] = (now + _STATE_TTL, github_id)
+
+
+def _consume_state(state: str, github_id: str) -> bool:
+    """Validate and consume an OAuth state value. Returns True if valid."""
+    with _state_lock:
+        entry = _state_store.pop(state, None)
+    if entry is None:
+        return False
+    expires_at, bound_id = entry
+    if time.time() > expires_at:
+        return False
+    if bound_id != github_id:
+        return False
+    return True
 
 
 async def _get_user_token(
@@ -63,9 +99,12 @@ async def _ensure_valid_token(
 
 
 @router.get("/auth-url", response_model=LinkedInAuthURLResponse)
-async def get_auth_url() -> LinkedInAuthURLResponse:
+async def get_auth_url(
+    auth: AuthenticatedUser = Depends(verify_auth),
+) -> LinkedInAuthURLResponse:
     """Return the LinkedIn OAuth2 authorization URL."""
     state = uuid.uuid4().hex
+    _store_state(state, auth.github_id)
     auth_url = build_auth_url(state)
     return LinkedInAuthURLResponse(auth_url=auth_url)
 
@@ -73,12 +112,15 @@ async def get_auth_url() -> LinkedInAuthURLResponse:
 @router.post("/callback", response_model=LinkedInTokenStatus)
 async def handle_callback(
     body: LinkedInCallbackRequest,
+    auth: AuthenticatedUser = Depends(verify_auth),
     session: AsyncSession = Depends(get_session),
-    x_github_id: str = Header(..., alias="X-GitHub-Id"),
-    x_github_username: str = Header("unknown", alias="X-GitHub-Username"),
 ) -> LinkedInTokenStatus:
     """Exchange authorization code for tokens and store them."""
-    user = await get_or_create_user(x_github_id, x_github_username, session)
+    # Validate OAuth state (CSRF protection)
+    if not _consume_state(body.state, auth.github_id):
+        raise HTTPException(400, "Invalid or expired OAuth state")
+
+    user = auth.db_user
 
     data = await exchange_code_for_tokens(body.code)
     access_token = data["access_token"]
@@ -103,17 +145,17 @@ async def handle_callback(
         session.add(token)
 
     await session.commit()
+    log_token_event(action="store", github_id=auth.github_id)
     return LinkedInTokenStatus(connected=True, expires_at=expires_at.isoformat())
 
 
 @router.get("/status", response_model=LinkedInTokenStatus)
 async def get_status(
+    auth: AuthenticatedUser = Depends(verify_auth),
     session: AsyncSession = Depends(get_session),
-    x_github_id: str = Header(..., alias="X-GitHub-Id"),
-    x_github_username: str = Header("unknown", alias="X-GitHub-Username"),
 ) -> LinkedInTokenStatus:
     """Check if the user has a valid LinkedIn connection."""
-    user = await get_or_create_user(x_github_id, x_github_username, session)
+    user = auth.db_user
     token = await _get_user_token(user.id, session)
 
     if not token:
@@ -132,12 +174,11 @@ async def get_status(
 @router.post("/publish", response_model=PublishResponse)
 async def publish_draft(
     body: PublishRequest,
+    auth: AuthenticatedUser = Depends(verify_auth),
     session: AsyncSession = Depends(get_session),
-    x_github_id: str = Header(..., alias="X-GitHub-Id"),
-    x_github_username: str = Header("unknown", alias="X-GitHub-Username"),
 ) -> PublishResponse:
     """Publish a draft to LinkedIn."""
-    user = await get_or_create_user(x_github_id, x_github_username, session)
+    user = auth.db_user
     token = await _get_user_token(user.id, session)
 
     if not token:
@@ -152,6 +193,10 @@ async def publish_draft(
     draft = result.scalar_one_or_none()
     if not draft:
         raise HTTPException(404, "Draft not found")
+
+    # Ownership check
+    if draft.user_id != user.id:
+        raise HTTPException(403, "Not authorized to publish this draft")
 
     try:
         # Get the user's LinkedIn profile URN
@@ -183,21 +228,24 @@ async def publish_draft(
         draft.published_at = datetime.now(timezone.utc)
         await session.commit()
 
+        log_publish_event(github_id=auth.github_id, draft_id=body.draft_id, success=True)
         return PublishResponse(success=True, post_url=post_url)
 
     except Exception as exc:
-        return PublishResponse(success=False, error=str(exc))
+        logger.error("Failed to publish draft %s: %s", body.draft_id, exc)
+        log_publish_event(github_id=auth.github_id, draft_id=body.draft_id, success=False, error=str(exc))
+        return PublishResponse(success=False, error="Failed to publish to LinkedIn. Please try again.")
 
 
 @router.delete("/disconnect", status_code=204)
 async def disconnect(
+    auth: AuthenticatedUser = Depends(verify_auth),
     session: AsyncSession = Depends(get_session),
-    x_github_id: str = Header(..., alias="X-GitHub-Id"),
-    x_github_username: str = Header("unknown", alias="X-GitHub-Username"),
 ) -> None:
     """Remove stored LinkedIn tokens."""
-    user = await get_or_create_user(x_github_id, x_github_username, session)
+    user = auth.db_user
     token = await _get_user_token(user.id, session)
     if token:
         await session.delete(token)
         await session.commit()
+        log_token_event(action="delete", github_id=auth.github_id)

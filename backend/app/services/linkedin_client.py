@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import logging
+import socket
 import urllib.parse
+from urllib.parse import urlparse
 
 import httpx
 
@@ -20,6 +23,33 @@ SCOPES = "w_member_social openid profile"
 
 _MAX_RETRIES = 3
 _BASE_DELAY = 1.0
+
+_BLOCKED_HOSTS = frozenset({
+    "metadata.google.internal",
+    "169.254.169.254",
+    "metadata.azure.com",
+    "100.100.100.200",
+})
+
+
+def _validate_image_url(url: str) -> None:
+    """Reject URLs pointing to private/internal networks."""
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"Unsupported scheme: {parsed.scheme}")
+    hostname = parsed.hostname
+    if not hostname:
+        raise ValueError("No hostname in URL")
+    if hostname in _BLOCKED_HOSTS:
+        raise ValueError(f"Blocked host: {hostname}")
+    try:
+        for info in socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM):
+            addr = info[4][0]
+            ip = ipaddress.ip_address(addr)
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                raise ValueError(f"URL resolves to private/reserved IP: {addr}")
+    except socket.gaierror as exc:
+        raise ValueError(f"DNS resolution failed for {hostname}: {exc}") from exc
 
 
 async def _request_with_retry(
@@ -150,6 +180,9 @@ async def upload_image(
         init_data = init_response.json()
         upload_url = init_data["value"]["uploadUrl"]
         image_urn = init_data["value"]["image"]
+
+        # Validate image URL before downloading (SSRF prevention)
+        _validate_image_url(image_url)
 
         # Step 2: Download image from source URL
         img_response = await client.get(image_url)

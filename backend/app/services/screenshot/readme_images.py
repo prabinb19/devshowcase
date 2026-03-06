@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import ipaddress
 import logging
+import socket
 from urllib.parse import urljoin, urlparse
 
 import httpx
@@ -15,6 +17,42 @@ from app.services.image_processor import (
 from app.services.r2_storage import upload_image
 
 logger = logging.getLogger(__name__)
+
+# Hosts that must never be contacted (cloud metadata endpoints, localhost, etc.)
+_BLOCKED_HOSTS = frozenset({
+    "metadata.google.internal",
+    "169.254.169.254",
+    "metadata.azure.com",
+    "100.100.100.200",
+})
+
+
+def _validate_image_url(url: str) -> None:
+    """Reject URLs that point to private/internal networks or metadata endpoints.
+
+    Raises ValueError if the URL is unsafe.
+    """
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"Unsupported scheme: {parsed.scheme}")
+
+    hostname = parsed.hostname
+    if not hostname:
+        raise ValueError("No hostname in URL")
+
+    if hostname in _BLOCKED_HOSTS:
+        raise ValueError(f"Blocked host: {hostname}")
+
+    # Resolve DNS and reject private IPs
+    try:
+        for info in socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM):
+            addr = info[4][0]
+            ip = ipaddress.ip_address(addr)
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                raise ValueError(f"URL resolves to private/reserved IP: {addr}")
+    except socket.gaierror as exc:
+        raise ValueError(f"DNS resolution failed for {hostname}: {exc}") from exc
+
 
 _MAX_IMAGES = 3
 _DOWNLOAD_TIMEOUT = 15.0
@@ -65,6 +103,7 @@ def capture_readme_images(
     for url in image_urls[:_MAX_IMAGES]:
         try:
             resolved_url = _resolve_github_url(url, repo_url)
+            _validate_image_url(resolved_url)  # SSRF prevention
             logger.info("Downloading README image: %s", resolved_url)
 
             with httpx.Client(timeout=_DOWNLOAD_TIMEOUT, follow_redirects=True) as client:

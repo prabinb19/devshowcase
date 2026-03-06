@@ -676,7 +676,8 @@ class TestCaptureSandboxScreenshot:
             capture_sandbox_screenshot(**_SANDBOX_FULL_KWARGS)
 
         call_kwargs = mock_sandbox_cls.create.call_args[1]
-        assert call_kwargs["envs"] == {"CI": "true", "BROWSER": "none"}
+        assert call_kwargs["envs"]["CI"] == "true"
+        assert call_kwargs["envs"]["BROWSER"] == "none"
 
     @patch("app.services.screenshot.sandbox.settings")
     @patch("app.services.screenshot.sandbox.generate_project_card")

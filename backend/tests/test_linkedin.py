@@ -13,6 +13,8 @@ from httpx import ASGITransport, AsyncClient
 
 from app.database import get_session
 from app.models import Draft, DraftStatus, Token, User
+from app.routes.deps import verify_auth
+from tests.conftest import make_fake_auth
 
 
 def _make_mock_session(*, execute_return=None) -> AsyncMock:
@@ -129,11 +131,19 @@ async def test_token_encryption_roundtrip(fernet_key: str):
 
 async def test_get_auth_url(client: AsyncClient):
     """GET /api/linkedin/auth-url returns a valid LinkedIn OAuth URL."""
+    from app.main import app
+
+    fake_auth = make_fake_auth()
+
     with patch("app.services.linkedin_client.settings") as mock_settings:
         mock_settings.linkedin_client_id = "test_client_id"
         mock_settings.linkedin_redirect_uri = "http://localhost:3000/api/linkedin/callback"
 
-        response = await client.get("/api/linkedin/auth-url")
+        app.dependency_overrides[verify_auth] = lambda: fake_auth
+        try:
+            response = await client.get("/api/linkedin/auth-url")
+        finally:
+            app.dependency_overrides.clear()
 
     assert response.status_code == 200
     data = response.json()
@@ -149,49 +159,49 @@ async def test_callback_stores_token(
     client: AsyncClient,
     github_id: str,
     github_username: str,
+    user_id: uuid.UUID,
     sample_user: User,
     fernet_key: str,
 ):
     """POST /api/linkedin/callback stores encrypted tokens."""
     from app.main import app
 
+    fake_auth = make_fake_auth(github_id=github_id, github_username=github_username, user_id=user_id)
+
     session = _make_mock_session()
 
-    # Mock get_or_create_user returning our sample user
-    with patch("app.routes.linkedin.get_or_create_user", new_callable=AsyncMock) as mock_user:
-        mock_user.return_value = sample_user
+    # Mock _get_user_token returning None (no existing token)
+    result_mock = MagicMock()
+    result_mock.scalar_one_or_none.return_value = None
+    session.execute = AsyncMock(return_value=result_mock)
 
-        # Mock _get_user_token returning None (no existing token)
-        result_mock = MagicMock()
-        result_mock.scalar_one_or_none.return_value = None
-        session.execute = AsyncMock(return_value=result_mock)
+    # Pre-store a valid state to pass validation
+    from app.routes.linkedin import _store_state
+    _store_state("test_state", github_id)
 
-        # Mock token exchange
-        with patch("app.routes.linkedin.exchange_code_for_tokens", new_callable=AsyncMock) as mock_exchange:
-            mock_exchange.return_value = {
-                "access_token": "new_access_token",
-                "refresh_token": "new_refresh_token",
-                "expires_in": 3600,
-            }
+    # Mock token exchange
+    with patch("app.routes.linkedin.exchange_code_for_tokens", new_callable=AsyncMock) as mock_exchange:
+        mock_exchange.return_value = {
+            "access_token": "new_access_token",
+            "refresh_token": "new_refresh_token",
+            "expires_in": 3600,
+        }
 
-            with patch("app.routes.linkedin.encrypt_token") as mock_encrypt:
-                mock_encrypt.return_value = "encrypted_value"
+        with patch("app.routes.linkedin.encrypt_token") as mock_encrypt:
+            mock_encrypt.return_value = "encrypted_value"
 
-                async def override_session():
-                    yield session
+            async def override_session():
+                yield session
 
-                app.dependency_overrides[get_session] = override_session
-                try:
-                    response = await client.post(
-                        "/api/linkedin/callback",
-                        json={"code": "test_auth_code", "state": "test_state"},
-                        headers={
-                            "X-GitHub-Id": github_id,
-                            "X-GitHub-Username": github_username,
-                        },
-                    )
-                finally:
-                    app.dependency_overrides.clear()
+            app.dependency_overrides[get_session] = override_session
+            app.dependency_overrides[verify_auth] = lambda: fake_auth
+            try:
+                response = await client.post(
+                    "/api/linkedin/callback",
+                    json={"code": "test_auth_code", "state": "test_state"},
+                )
+            finally:
+                app.dependency_overrides.clear()
 
     assert response.status_code == 200
     data = response.json()
@@ -204,8 +214,7 @@ async def test_callback_stores_token(
 
 async def test_status_connected(
     client: AsyncClient,
-    github_id: str,
-    github_username: str,
+    user_id: uuid.UUID,
     sample_user: User,
     sample_token: Token,
     fernet_key: str,
@@ -213,30 +222,24 @@ async def test_status_connected(
     """GET /api/linkedin/status returns connected=True when token exists."""
     from app.main import app
 
+    fake_auth = make_fake_auth(user_id=user_id)
+
     session = _make_mock_session()
 
-    with patch("app.routes.linkedin.get_or_create_user", new_callable=AsyncMock) as mock_user:
-        mock_user.return_value = sample_user
+    result_mock = MagicMock()
+    result_mock.scalar_one_or_none.return_value = sample_token
+    session.execute = AsyncMock(return_value=result_mock)
 
-        result_mock = MagicMock()
-        result_mock.scalar_one_or_none.return_value = sample_token
-        session.execute = AsyncMock(return_value=result_mock)
+    with patch("app.routes.linkedin.decrypt_token", return_value="test_access_token"):
+        async def override_session():
+            yield session
 
-        with patch("app.routes.linkedin.decrypt_token", return_value="test_access_token"):
-            async def override_session():
-                yield session
-
-            app.dependency_overrides[get_session] = override_session
-            try:
-                response = await client.get(
-                    "/api/linkedin/status",
-                    headers={
-                        "X-GitHub-Id": github_id,
-                        "X-GitHub-Username": github_username,
-                    },
-                )
-            finally:
-                app.dependency_overrides.clear()
+        app.dependency_overrides[get_session] = override_session
+        app.dependency_overrides[verify_auth] = lambda: fake_auth
+        try:
+            response = await client.get("/api/linkedin/status")
+        finally:
+            app.dependency_overrides.clear()
 
     assert response.status_code == 200
     data = response.json()
@@ -245,36 +248,29 @@ async def test_status_connected(
 
 async def test_status_not_connected(
     client: AsyncClient,
-    github_id: str,
-    github_username: str,
+    user_id: uuid.UUID,
     sample_user: User,
 ):
     """GET /api/linkedin/status returns connected=False when no token."""
     from app.main import app
 
+    fake_auth = make_fake_auth(user_id=user_id)
+
     session = _make_mock_session()
 
-    with patch("app.routes.linkedin.get_or_create_user", new_callable=AsyncMock) as mock_user:
-        mock_user.return_value = sample_user
+    result_mock = MagicMock()
+    result_mock.scalar_one_or_none.return_value = None
+    session.execute = AsyncMock(return_value=result_mock)
 
-        result_mock = MagicMock()
-        result_mock.scalar_one_or_none.return_value = None
-        session.execute = AsyncMock(return_value=result_mock)
+    async def override_session():
+        yield session
 
-        async def override_session():
-            yield session
-
-        app.dependency_overrides[get_session] = override_session
-        try:
-            response = await client.get(
-                "/api/linkedin/status",
-                headers={
-                    "X-GitHub-Id": github_id,
-                    "X-GitHub-Username": github_username,
-                },
-            )
-        finally:
-            app.dependency_overrides.clear()
+    app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[verify_auth] = lambda: fake_auth
+    try:
+        response = await client.get("/api/linkedin/status")
+    finally:
+        app.dependency_overrides.clear()
 
     assert response.status_code == 200
     data = response.json()
@@ -286,14 +282,15 @@ async def test_status_not_connected(
 
 async def test_publish_success(
     client: AsyncClient,
-    github_id: str,
-    github_username: str,
+    user_id: uuid.UUID,
     sample_user: User,
     sample_token: Token,
     sample_draft: Draft,
 ):
     """POST /api/linkedin/publish succeeds with mocked LinkedIn API."""
     from app.main import app
+
+    fake_auth = make_fake_auth(user_id=user_id)
 
     session = _make_mock_session()
 
@@ -307,7 +304,6 @@ async def test_publish_success(
     session.execute = AsyncMock(side_effect=[result_token, result_draft])
 
     with (
-        patch("app.routes.linkedin.get_or_create_user", new_callable=AsyncMock, return_value=sample_user),
         patch("app.routes.linkedin.decrypt_token", return_value="test_access_token"),
         patch("app.routes.linkedin.get_linkedin_profile", new_callable=AsyncMock, return_value="urn:li:person:abc123"),
         patch("app.routes.linkedin.upload_image", new_callable=AsyncMock, return_value="urn:li:image:img1"),
@@ -318,14 +314,11 @@ async def test_publish_success(
             yield session
 
         app.dependency_overrides[get_session] = override_session
+        app.dependency_overrides[verify_auth] = lambda: fake_auth
         try:
             response = await client.post(
                 "/api/linkedin/publish",
                 json={"draft_id": str(sample_draft.id)},
-                headers={
-                    "X-GitHub-Id": github_id,
-                    "X-GitHub-Username": github_username,
-                },
             )
         finally:
             app.dependency_overrides.clear()
@@ -338,12 +331,13 @@ async def test_publish_success(
 
 async def test_publish_no_token(
     client: AsyncClient,
-    github_id: str,
-    github_username: str,
+    user_id: uuid.UUID,
     sample_user: User,
 ):
     """POST /api/linkedin/publish returns 401 when not connected."""
     from app.main import app
+
+    fake_auth = make_fake_auth(user_id=user_id)
 
     session = _make_mock_session()
 
@@ -351,35 +345,32 @@ async def test_publish_no_token(
     result_mock.scalar_one_or_none.return_value = None
     session.execute = AsyncMock(return_value=result_mock)
 
-    with patch("app.routes.linkedin.get_or_create_user", new_callable=AsyncMock, return_value=sample_user):
-        async def override_session():
-            yield session
+    async def override_session():
+        yield session
 
-        app.dependency_overrides[get_session] = override_session
-        try:
-            response = await client.post(
-                "/api/linkedin/publish",
-                json={"draft_id": str(uuid.uuid4())},
-                headers={
-                    "X-GitHub-Id": github_id,
-                    "X-GitHub-Username": github_username,
-                },
-            )
-        finally:
-            app.dependency_overrides.clear()
+    app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[verify_auth] = lambda: fake_auth
+    try:
+        response = await client.post(
+            "/api/linkedin/publish",
+            json={"draft_id": str(uuid.uuid4())},
+        )
+    finally:
+        app.dependency_overrides.clear()
 
     assert response.status_code == 401
 
 
 async def test_publish_draft_not_found(
     client: AsyncClient,
-    github_id: str,
-    github_username: str,
+    user_id: uuid.UUID,
     sample_user: User,
     sample_token: Token,
 ):
     """POST /api/linkedin/publish returns 404 when draft doesn't exist."""
     from app.main import app
+
+    fake_auth = make_fake_auth(user_id=user_id)
 
     session = _make_mock_session()
 
@@ -391,22 +382,16 @@ async def test_publish_draft_not_found(
 
     session.execute = AsyncMock(side_effect=[result_token, result_draft])
 
-    with (
-        patch("app.routes.linkedin.get_or_create_user", new_callable=AsyncMock, return_value=sample_user),
-        patch("app.routes.linkedin.decrypt_token", return_value="test_access_token"),
-    ):
+    with patch("app.routes.linkedin.decrypt_token", return_value="test_access_token"):
         async def override_session():
             yield session
 
         app.dependency_overrides[get_session] = override_session
+        app.dependency_overrides[verify_auth] = lambda: fake_auth
         try:
             response = await client.post(
                 "/api/linkedin/publish",
                 json={"draft_id": str(uuid.uuid4())},
-                headers={
-                    "X-GitHub-Id": github_id,
-                    "X-GitHub-Username": github_username,
-                },
             )
         finally:
             app.dependency_overrides.clear()
@@ -443,13 +428,14 @@ async def test_retry_on_server_error():
 
 async def test_disconnect(
     client: AsyncClient,
-    github_id: str,
-    github_username: str,
+    user_id: uuid.UUID,
     sample_user: User,
     sample_token: Token,
 ):
     """DELETE /api/linkedin/disconnect removes the token and returns 204."""
     from app.main import app
+
+    fake_auth = make_fake_auth(user_id=user_id)
 
     session = _make_mock_session()
 
@@ -457,21 +443,15 @@ async def test_disconnect(
     result_mock.scalar_one_or_none.return_value = sample_token
     session.execute = AsyncMock(return_value=result_mock)
 
-    with patch("app.routes.linkedin.get_or_create_user", new_callable=AsyncMock, return_value=sample_user):
-        async def override_session():
-            yield session
+    async def override_session():
+        yield session
 
-        app.dependency_overrides[get_session] = override_session
-        try:
-            response = await client.delete(
-                "/api/linkedin/disconnect",
-                headers={
-                    "X-GitHub-Id": github_id,
-                    "X-GitHub-Username": github_username,
-                },
-            )
-        finally:
-            app.dependency_overrides.clear()
+    app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[verify_auth] = lambda: fake_auth
+    try:
+        response = await client.delete("/api/linkedin/disconnect")
+    finally:
+        app.dependency_overrides.clear()
 
     assert response.status_code == 204
     session.delete.assert_called_once_with(sample_token)
