@@ -87,7 +87,11 @@ def capture_sandbox_screenshot(
             "api_key": settings.e2b_api_key,
             "resolution": (1280, 800),
             "timeout": 300,
-            "envs": {"CI": "true", "BROWSER": "none"},
+            "envs": {
+                "CI": "true",
+                "BROWSER": "none",
+                "GITHUB_TOKEN": settings.github_token,
+            },
         }
         if settings.e2b_template_id:
             create_kwargs["template"] = settings.e2b_template_id

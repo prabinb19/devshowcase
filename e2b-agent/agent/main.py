@@ -1,6 +1,7 @@
 """DevShowcase agent — runs inside E2B sandbox."""
 
 import json
+import os
 import sys
 import traceback
 
@@ -17,8 +18,8 @@ def main() -> None:
         mission = read_mission()
 
         repo_url = mission["repo_url"]
-        gemini_api_key = mission["gemini_api_key"]
-        github_token = mission.get("github_token", "")
+        gemini_api_key = os.environ["GEMINI_API_KEY"]
+        github_token = os.environ.get("GITHUB_TOKEN", "")
 
         # Step 1: Explore
         update_progress("exploring", "Cloning and exploring repository...")

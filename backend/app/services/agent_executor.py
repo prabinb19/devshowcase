@@ -70,7 +70,7 @@ async def _provision_agent(sandbox: DesktopSandbox, queue: asyncio.Queue[dict[st
     # Install Python deps (no-op if already in template)
     dep_result = await asyncio.to_thread(
         sandbox.commands.run,
-        "pip3 install -q google-genai httpx",
+        "pip3 install -q google-genai==1.14.0 httpx==0.28.1",
     )
     if dep_result.exit_code != 0:
         logger.warning("pip install failed (exit %d): %s", dep_result.exit_code, dep_result.stderr)
@@ -101,7 +101,11 @@ async def start_agent_run(run_id: uuid.UUID, user_id: uuid.UUID, repo_url: str) 
             template=settings.e2b_template_id or None,
             timeout=settings.agent_sandbox_timeout,
             resolution=(1280, 800),
-            envs={"CI": "true"},
+            envs={
+                "CI": "true",
+                "GEMINI_API_KEY": settings.gemini_api_key,
+                "GITHUB_TOKEN": settings.github_token,
+            },
             api_key=settings.e2b_api_key,
         )
         _agent_sandboxes[rid] = sandbox
@@ -120,8 +124,6 @@ async def start_agent_run(run_id: uuid.UUID, user_id: uuid.UUID, repo_url: str) 
         # Write mission file
         mission = {
             "repo_url": repo_url,
-            "gemini_api_key": settings.gemini_api_key,
-            "github_token": settings.github_token,
             "portfolio_repo": settings.portfolio_repo,
             "portfolio_owner": settings.portfolio_owner,
         }
@@ -163,8 +165,8 @@ async def start_agent_run(run_id: uuid.UUID, user_id: uuid.UUID, repo_url: str) 
 
     except Exception as exc:
         logger.exception("Agent run %s failed", run_id)
-        await _update_run_status(run_id, RunStatus.failed, error=str(exc))
-        queue.put_nowait({"stage": "error", "message": str(exc)})
+        await _update_run_status(run_id, RunStatus.failed, error="Agent run failed unexpectedly")
+        queue.put_nowait({"stage": "error", "message": "Agent run failed unexpectedly"})
     finally:
         _cleanup(rid)
 
@@ -220,11 +222,9 @@ async def _monitor_agent(
                         pass
                     error_msg = "Agent failed to start within timeout"
                     if agent_log.strip():
-                        # Include last 500 chars of log in error
-                        error_msg += f" — log tail: {agent_log.strip()[-500:]}"
+                        logger.error("Run %s startup timeout — log tail: %s", run_id, agent_log.strip()[-500:])
                     else:
-                        error_msg += " — no agent.log found (process may not have started)"
-                    logger.error("Run %s: %s", run_id, error_msg)
+                        logger.error("Run %s startup timeout — no agent.log found", run_id)
                     await _update_run_status(run_id, RunStatus.failed, error=error_msg)
                     queue.put_nowait({"stage": "error", "message": error_msg})
                     return

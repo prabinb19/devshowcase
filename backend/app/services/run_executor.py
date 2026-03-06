@@ -70,7 +70,7 @@ async def execute_graph(
             run = result.scalar_one_or_none()
             if run:
                 run.status = RunStatus.failed
-                run.error = str(exc)[:500]
+                run.error = "Pipeline execution failed unexpectedly"
                 await session.commit()
 
 
@@ -115,5 +115,5 @@ async def execute_graph_from_generate(
             run = db_result.scalar_one_or_none()
             if run:
                 run.status = RunStatus.failed
-                run.error = str(exc)[:500]
+                run.error = "Post regeneration failed unexpectedly"
                 await session.commit()

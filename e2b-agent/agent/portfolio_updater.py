@@ -1,6 +1,7 @@
 """Create a PR to add the project to a portfolio site repository."""
 
 import json
+import os
 import re
 import subprocess
 from datetime import date
@@ -20,7 +21,7 @@ def update_portfolio(
     """
     portfolio_repo = mission.get("portfolio_repo")
     portfolio_owner = mission.get("portfolio_owner")
-    github_token = mission.get("github_token", "")
+    github_token = os.environ.get("GITHUB_TOKEN", "")
 
     if not portfolio_repo or not portfolio_owner or not github_token:
         return None
