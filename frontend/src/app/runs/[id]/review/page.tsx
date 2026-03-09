@@ -274,7 +274,26 @@ export default function ReviewPage() {
           </div>
 
           {/* Right Column - Preview */}
-          <div>
+          <div className="flex flex-col gap-4">
+            {/* AI Transparency Disclosure */}
+            <div className="flex items-start gap-2 bevel-outset bg-win98-silver px-3 py-2">
+              <span className="text-sm leading-5">*</span>
+              <p className="text-xs text-win98-black">
+                <span className="font-bold">AI-Generated Content</span> — This draft was created
+                by an AI model analyzing the repository. Review and edit before publishing.
+                Per{" "}
+                <a
+                  href="https://www.microsoft.com/en-us/ai/principles-and-approach"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-win98-blue hover:text-win98-red underline"
+                >
+                  Microsoft Responsible AI
+                </a>{" "}
+                transparency principles, AI-assisted content should be disclosed.
+              </p>
+            </div>
+
             <Card header={<h2 className="text-lg font-semibold text-white">LinkedIn Preview</h2>}>
               <div className="flex flex-col gap-3">
                 <div className="flex items-center gap-3">

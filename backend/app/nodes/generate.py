@@ -9,6 +9,7 @@ from langgraph.config import get_stream_writer
 
 from app.config import settings
 from app.prompts.generate import GENERATE_SYSTEM_PROMPT
+from app.services.content_safety import ContentSafetyError, validate_post_content
 from app.services.llm_client import get_anthropic_client
 from app.state import AgentState, PostDraft
 
@@ -148,6 +149,16 @@ async def generate(state: AgentState) -> dict[str, Any]:
         first_comment = tool_result.get("first_comment", "")
         if len(first_comment) > _MAX_FIRST_COMMENT_CHARS:
             first_comment = first_comment[:_MAX_FIRST_COMMENT_CHARS]
+
+        # Content safety validation (Microsoft Responsible AI)
+        try:
+            body, first_comment = validate_post_content(body, first_comment)
+        except ContentSafetyError as exc:
+            logger.warning("Content safety blocked draft: %s", exc.reason)
+            return {
+                "error": f"Generated content blocked by safety filter: {exc.reason}",
+                "current_stage": "generating",
+            }
 
         alt_texts = [
             alt[:_MAX_ALT_TEXT_CHARS]
