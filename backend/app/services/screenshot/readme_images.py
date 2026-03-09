@@ -19,12 +19,14 @@ from app.services.r2_storage import upload_image
 logger = logging.getLogger(__name__)
 
 # Hosts that must never be contacted (cloud metadata endpoints, localhost, etc.)
-_BLOCKED_HOSTS = frozenset({
-    "metadata.google.internal",
-    "169.254.169.254",
-    "metadata.azure.com",
-    "100.100.100.200",
-})
+_BLOCKED_HOSTS = frozenset(
+    {
+        "metadata.google.internal",
+        "169.254.169.254",
+        "metadata.azure.com",
+        "100.100.100.200",
+    }
+)
 
 
 def _validate_image_url(url: str) -> None:
@@ -45,7 +47,9 @@ def _validate_image_url(url: str) -> None:
 
     # Resolve DNS and reject private IPs
     try:
-        for info in socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM):
+        for info in socket.getaddrinfo(
+            hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM
+        ):
             addr = info[4][0]
             ip = ipaddress.ip_address(addr)
             if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
@@ -106,13 +110,17 @@ def capture_readme_images(
             _validate_image_url(resolved_url)  # SSRF prevention
             logger.info("Downloading README image: %s", resolved_url)
 
-            with httpx.Client(timeout=_DOWNLOAD_TIMEOUT, follow_redirects=True) as client:
+            with httpx.Client(
+                timeout=_DOWNLOAD_TIMEOUT, follow_redirects=True
+            ) as client:
                 resp = client.get(resolved_url)
                 resp.raise_for_status()
 
             raw_bytes = resp.content
             if len(raw_bytes) > _MAX_DOWNLOAD_BYTES:
-                logger.warning("Skipping oversized image: %s (%d bytes)", url, len(raw_bytes))
+                logger.warning(
+                    "Skipping oversized image: %s (%d bytes)", url, len(raw_bytes)
+                )
                 continue
 
             if not validate_image(raw_bytes):
@@ -129,13 +137,15 @@ def capture_readme_images(
 
             public_url = upload_image(processed, run_id, filename)
 
-            screenshots.append({
-                "url": public_url,
-                "alt_text": f"README image: {filename}",
-                "source": "readme",
-                "width": width,
-                "height": height,
-            })
+            screenshots.append(
+                {
+                    "url": public_url,
+                    "alt_text": f"README image: {filename}",
+                    "source": "readme",
+                    "width": width,
+                    "height": height,
+                }
+            )
 
         except Exception:
             logger.exception("Failed to process README image: %s", url)

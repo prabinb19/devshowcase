@@ -1,4 +1,5 @@
 """API endpoints for user preferences/settings."""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends

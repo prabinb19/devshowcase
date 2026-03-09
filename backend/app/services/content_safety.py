@@ -17,8 +17,14 @@ logger = logging.getLogger(__name__)
 _BLOCKED_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"(?i)\b(kill|murder|attack|bomb|weapon)\b"), "violent language"),
     (re.compile(r"(?i)\b(hate|slur|racial|sexist|homophobic)\b"), "hateful language"),
-    (re.compile(r"(?i)\b(password|secret.?key|api.?key|bearer [a-z0-9])\b"), "potential credential leak"),
-    (re.compile(r"(?i)ignore (all )?(previous |prior )?instructions"), "prompt injection echo"),
+    (
+        re.compile(r"(?i)\b(password|secret.?key|api.?key|bearer [a-z0-9])\b"),
+        "potential credential leak",
+    ),
+    (
+        re.compile(r"(?i)ignore (all )?(previous |prior )?instructions"),
+        "prompt injection echo",
+    ),
     (re.compile(r"(?i)you are (now )?a|act as|pretend to be"), "role hijack echo"),
     (re.compile(r"(?i)system prompt|instruction hierarchy"), "system prompt leak"),
 ]

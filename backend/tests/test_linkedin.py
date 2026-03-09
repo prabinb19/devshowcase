@@ -137,7 +137,9 @@ async def test_get_auth_url(client: AsyncClient):
 
     with patch("app.services.linkedin_client.settings") as mock_settings:
         mock_settings.linkedin_client_id = "test_client_id"
-        mock_settings.linkedin_redirect_uri = "http://localhost:3000/api/linkedin/callback"
+        mock_settings.linkedin_redirect_uri = (
+            "http://localhost:3000/api/linkedin/callback"
+        )
 
         app.dependency_overrides[verify_auth] = lambda: fake_auth
         try:
@@ -166,7 +168,9 @@ async def test_callback_stores_token(
     """POST /api/linkedin/callback stores encrypted tokens."""
     from app.main import app
 
-    fake_auth = make_fake_auth(github_id=github_id, github_username=github_username, user_id=user_id)
+    fake_auth = make_fake_auth(
+        github_id=github_id, github_username=github_username, user_id=user_id
+    )
 
     session = _make_mock_session()
 
@@ -177,10 +181,13 @@ async def test_callback_stores_token(
 
     # Pre-store a valid state to pass validation
     from app.routes.linkedin import _store_state
+
     _store_state("test_state", github_id)
 
     # Mock token exchange
-    with patch("app.routes.linkedin.exchange_code_for_tokens", new_callable=AsyncMock) as mock_exchange:
+    with patch(
+        "app.routes.linkedin.exchange_code_for_tokens", new_callable=AsyncMock
+    ) as mock_exchange:
         mock_exchange.return_value = {
             "access_token": "new_access_token",
             "refresh_token": "new_refresh_token",
@@ -231,6 +238,7 @@ async def test_status_connected(
     session.execute = AsyncMock(return_value=result_mock)
 
     with patch("app.routes.linkedin.decrypt_token", return_value="test_access_token"):
+
         async def override_session():
             yield session
 
@@ -305,11 +313,24 @@ async def test_publish_success(
 
     with (
         patch("app.routes.linkedin.decrypt_token", return_value="test_access_token"),
-        patch("app.routes.linkedin.get_linkedin_profile", new_callable=AsyncMock, return_value="urn:li:person:abc123"),
-        patch("app.routes.linkedin.upload_image", new_callable=AsyncMock, return_value="urn:li:image:img1"),
-        patch("app.routes.linkedin.create_post", new_callable=AsyncMock, return_value={"post_urn": "urn:li:share:12345", "status_code": 201}),
+        patch(
+            "app.routes.linkedin.get_linkedin_profile",
+            new_callable=AsyncMock,
+            return_value="urn:li:person:abc123",
+        ),
+        patch(
+            "app.routes.linkedin.upload_image",
+            new_callable=AsyncMock,
+            return_value="urn:li:image:img1",
+        ),
+        patch(
+            "app.routes.linkedin.create_post",
+            new_callable=AsyncMock,
+            return_value={"post_urn": "urn:li:share:12345", "status_code": 201},
+        ),
         patch("app.routes.linkedin.create_comment", new_callable=AsyncMock),
     ):
+
         async def override_session():
             yield session
 
@@ -383,6 +404,7 @@ async def test_publish_draft_not_found(
     session.execute = AsyncMock(side_effect=[result_token, result_draft])
 
     with patch("app.routes.linkedin.decrypt_token", return_value="test_access_token"):
+
         async def override_session():
             yield session
 
@@ -417,7 +439,9 @@ async def test_retry_on_server_error():
     mock_client.request = AsyncMock(side_effect=[response_500, response_200])
 
     with patch("app.services.linkedin_client.asyncio.sleep", new_callable=AsyncMock):
-        result = await _request_with_retry(mock_client, "GET", "https://api.linkedin.com/test")
+        result = await _request_with_retry(
+            mock_client, "GET", "https://api.linkedin.com/test"
+        )
 
     assert result.status_code == 200
     assert mock_client.request.call_count == 2

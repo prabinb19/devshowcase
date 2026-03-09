@@ -5,7 +5,6 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 
 from app.nodes.generate import (
     _build_tool_schema,
@@ -52,8 +51,16 @@ def _sample_analysis() -> dict:
 
 def _sample_screenshots() -> list[dict]:
     return [
-        {"url": "https://cdn.example.com/shot1.png", "alt_text": "Dashboard overview", "source": "sandbox"},
-        {"url": "https://cdn.example.com/shot2.png", "alt_text": "", "source": "readme"},
+        {
+            "url": "https://cdn.example.com/shot1.png",
+            "alt_text": "Dashboard overview",
+            "source": "sandbox",
+        },
+        {
+            "url": "https://cdn.example.com/shot2.png",
+            "alt_text": "",
+            "source": "readme",
+        },
     ]
 
 

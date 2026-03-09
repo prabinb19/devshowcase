@@ -100,9 +100,7 @@ class TestFetchRepoMetadata:
             },
             request=httpx.Request("GET", "https://api.github.com/repos/owner/myrepo"),
         )
-        with patch(
-            "app.services.github_client._get_client"
-        ) as mock_get_client:
+        with patch("app.services.github_client._get_client") as mock_get_client:
             client = AsyncMock()
             client.get = AsyncMock(return_value=mock_resp)
             mock_get_client.return_value = client
@@ -132,9 +130,7 @@ class TestFetchRepoMetadata:
             },
             request=httpx.Request("GET", "https://api.github.com/repos/owner/myrepo"),
         )
-        with patch(
-            "app.services.github_client._get_client"
-        ) as mock_get_client:
+        with patch("app.services.github_client._get_client") as mock_get_client:
             client = AsyncMock()
             client.get = AsyncMock(return_value=mock_resp)
             mock_get_client.return_value = client
@@ -155,9 +151,7 @@ class TestFetchReadme:
             json={"content": content, "encoding": "base64"},
             request=httpx.Request("GET", "https://api.github.com/repos/o/r/readme"),
         )
-        with patch(
-            "app.services.github_client._get_client"
-        ) as mock_get_client:
+        with patch("app.services.github_client._get_client") as mock_get_client:
             client = AsyncMock()
             client.get = AsyncMock(return_value=mock_resp)
             mock_get_client.return_value = client
@@ -171,9 +165,7 @@ class TestFetchReadme:
             404,
             request=httpx.Request("GET", "https://api.github.com/repos/o/r/readme"),
         )
-        with patch(
-            "app.services.github_client._get_client"
-        ) as mock_get_client:
+        with patch("app.services.github_client._get_client") as mock_get_client:
             client = AsyncMock()
             client.get = AsyncMock(return_value=mock_resp)
             mock_get_client.return_value = client
@@ -192,11 +184,11 @@ class TestFetchFileTree:
         mock_resp = httpx.Response(
             200,
             json={"tree": tree_items},
-            request=httpx.Request("GET", "https://api.github.com/repos/o/r/git/trees/main"),
+            request=httpx.Request(
+                "GET", "https://api.github.com/repos/o/r/git/trees/main"
+            ),
         )
-        with patch(
-            "app.services.github_client._get_client"
-        ) as mock_get_client:
+        with patch("app.services.github_client._get_client") as mock_get_client:
             client = AsyncMock()
             client.get = AsyncMock(return_value=mock_resp)
             mock_get_client.return_value = client
@@ -210,11 +202,11 @@ class TestFetchFileTree:
         mock_resp = httpx.Response(
             200,
             json={"tree": tree_items},
-            request=httpx.Request("GET", "https://api.github.com/repos/o/r/git/trees/main"),
+            request=httpx.Request(
+                "GET", "https://api.github.com/repos/o/r/git/trees/main"
+            ),
         )
-        with patch(
-            "app.services.github_client._get_client"
-        ) as mock_get_client:
+        with patch("app.services.github_client._get_client") as mock_get_client:
             client = AsyncMock()
             client.get = AsyncMock(return_value=mock_resp)
             mock_get_client.return_value = client
@@ -226,16 +218,18 @@ class TestFetchFileTree:
     async def test_fallback_to_master(self) -> None:
         not_found = httpx.Response(
             404,
-            request=httpx.Request("GET", "https://api.github.com/repos/o/r/git/trees/main"),
+            request=httpx.Request(
+                "GET", "https://api.github.com/repos/o/r/git/trees/main"
+            ),
         )
         master_resp = httpx.Response(
             200,
             json={"tree": [{"path": "README.md"}]},
-            request=httpx.Request("GET", "https://api.github.com/repos/o/r/git/trees/master"),
+            request=httpx.Request(
+                "GET", "https://api.github.com/repos/o/r/git/trees/master"
+            ),
         )
-        with patch(
-            "app.services.github_client._get_client"
-        ) as mock_get_client:
+        with patch("app.services.github_client._get_client") as mock_get_client:
             client = AsyncMock()
             client.get = AsyncMock(side_effect=[not_found, master_resp])
             mock_get_client.return_value = client
@@ -254,11 +248,11 @@ class TestFetchConfigFiles:
         mock_resp = httpx.Response(
             200,
             json={"content": content, "encoding": "base64", "size": 100},
-            request=httpx.Request("GET", "https://api.github.com/repos/o/r/contents/package.json"),
+            request=httpx.Request(
+                "GET", "https://api.github.com/repos/o/r/contents/package.json"
+            ),
         )
-        with patch(
-            "app.services.github_client._get_client"
-        ) as mock_get_client:
+        with patch("app.services.github_client._get_client") as mock_get_client:
             client = AsyncMock()
             client.get = AsyncMock(return_value=mock_resp)
             mock_get_client.return_value = client
@@ -272,16 +266,12 @@ class TestFetchConfigFiles:
 
     async def test_skips_absent_files(self) -> None:
         """Files not in the tree are not fetched."""
-        with patch(
-            "app.services.github_client._get_client"
-        ) as mock_get_client:
+        with patch("app.services.github_client._get_client") as mock_get_client:
             client = AsyncMock()
             client.get = AsyncMock()
             mock_get_client.return_value = client
 
-            result = await fetch_config_files(
-                "o", "r", ["src/main.py", "README.md"]
-            )
+            result = await fetch_config_files("o", "r", ["src/main.py", "README.md"])
 
         assert result == {}
         client.get.assert_not_called()
@@ -291,11 +281,11 @@ class TestFetchConfigFiles:
         mock_resp = httpx.Response(
             200,
             json={"content": "big", "encoding": "base64", "size": 60_000},
-            request=httpx.Request("GET", "https://api.github.com/repos/o/r/contents/package.json"),
+            request=httpx.Request(
+                "GET", "https://api.github.com/repos/o/r/contents/package.json"
+            ),
         )
-        with patch(
-            "app.services.github_client._get_client"
-        ) as mock_get_client:
+        with patch("app.services.github_client._get_client") as mock_get_client:
             client = AsyncMock()
             client.get = AsyncMock(return_value=mock_resp)
             mock_get_client.return_value = client
@@ -367,12 +357,16 @@ class TestIngestNode:
         readme_resp = httpx.Response(
             200,
             json={"content": readme_b64, "encoding": "base64"},
-            request=httpx.Request("GET", "https://api.github.com/repos/owner/myrepo/readme"),
+            request=httpx.Request(
+                "GET", "https://api.github.com/repos/owner/myrepo/readme"
+            ),
         )
         tree_resp = httpx.Response(
             200,
             json={"tree": [{"path": "README.md"}, {"path": "requirements.txt"}]},
-            request=httpx.Request("GET", "https://api.github.com/repos/owner/myrepo/git/trees/main"),
+            request=httpx.Request(
+                "GET", "https://api.github.com/repos/owner/myrepo/git/trees/main"
+            ),
         )
         config_resp = httpx.Response(
             200,
@@ -381,13 +375,14 @@ class TestIngestNode:
                 "encoding": "base64",
                 "size": 10,
             },
-            request=httpx.Request("GET", "https://api.github.com/repos/owner/myrepo/contents/requirements.txt"),
+            request=httpx.Request(
+                "GET",
+                "https://api.github.com/repos/owner/myrepo/contents/requirements.txt",
+            ),
         )
 
         with (
-            patch(
-                "app.services.github_client._get_client"
-            ) as mock_get_client,
+            patch("app.services.github_client._get_client") as mock_get_client,
             patch("app.nodes.ingest.get_stream_writer") as mock_writer,
         ):
             client = AsyncMock()
@@ -429,13 +424,13 @@ class TestIngestNode:
 
         resp_404 = httpx.Response(
             404,
-            request=httpx.Request("GET", "https://api.github.com/repos/owner/nonexistent"),
+            request=httpx.Request(
+                "GET", "https://api.github.com/repos/owner/nonexistent"
+            ),
         )
 
         with (
-            patch(
-                "app.services.github_client._get_client"
-            ) as mock_get_client,
+            patch("app.services.github_client._get_client") as mock_get_client,
             patch("app.nodes.ingest.get_stream_writer") as mock_writer,
         ):
             client = AsyncMock()

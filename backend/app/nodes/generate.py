@@ -27,9 +27,7 @@ def _build_tool_schema() -> dict[str, Any]:
     """Derive tool schema from PostDraft, keeping only LLM-generated fields."""
     schema = PostDraft.model_json_schema()
     keep = {"body", "first_comment", "alt_texts"}
-    properties = {
-        k: v for k, v in schema.get("properties", {}).items() if k in keep
-    }
+    properties = {k: v for k, v in schema.get("properties", {}).items() if k in keep}
     required = [f for f in schema.get("required", []) if f in keep]
     return {
         "name": "generate_linkedin_post",
@@ -161,8 +159,7 @@ async def generate(state: AgentState) -> dict[str, Any]:
             }
 
         alt_texts = [
-            alt[:_MAX_ALT_TEXT_CHARS]
-            for alt in tool_result.get("alt_texts", [])
+            alt[:_MAX_ALT_TEXT_CHARS] for alt in tool_result.get("alt_texts", [])
         ]
 
         # Assemble PostDraft with programmatic fields

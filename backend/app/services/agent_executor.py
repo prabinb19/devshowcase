@@ -26,6 +26,7 @@ _agent_events: dict[str, asyncio.Queue[dict[str, Any]]] = {}
 _agent_sandboxes: dict[str, DesktopSandbox] = {}
 _pending_questions: dict[str, dict[str, Any]] = {}
 
+
 # Map agent progress stages to RunStatus values
 def _start_stream(sandbox: DesktopSandbox) -> str | None:
     """Start desktop stream and return the view-only URL, or None on failure."""
@@ -43,9 +44,13 @@ def _start_stream(sandbox: DesktopSandbox) -> str | None:
 _AGENT_STARTUP_TIMEOUT = 120  # seconds to wait for status.json before failing
 
 
-async def _provision_agent(sandbox: DesktopSandbox, queue: asyncio.Queue[dict[str, Any]]) -> None:
+async def _provision_agent(
+    sandbox: DesktopSandbox, queue: asyncio.Queue[dict[str, Any]]
+) -> None:
     """Upload agent source files and ensure Python deps are installed."""
-    queue.put_nowait({"stage": "agent_starting", "message": "Provisioning agent code..."})
+    queue.put_nowait(
+        {"stage": "agent_starting", "message": "Provisioning agent code..."}
+    )
 
     # Create required directories (world-writable so agent process can write)
     await asyncio.to_thread(
@@ -58,7 +63,9 @@ async def _provision_agent(sandbox: DesktopSandbox, queue: asyncio.Queue[dict[st
     for src_file in _AGENT_SRC_DIR.iterdir():
         if src_file.is_file():
             content = src_file.read_text()
-            await asyncio.to_thread(sandbox.files.write, f"/agent/{src_file.name}", content)
+            await asyncio.to_thread(
+                sandbox.files.write, f"/agent/{src_file.name}", content
+            )
 
     # Set git identity for portfolio commits
     await asyncio.to_thread(
@@ -73,7 +80,9 @@ async def _provision_agent(sandbox: DesktopSandbox, queue: asyncio.Queue[dict[st
         "pip3 install -q google-genai==1.14.0 httpx==0.28.1",
     )
     if dep_result.exit_code != 0:
-        logger.warning("pip install failed (exit %d): %s", dep_result.exit_code, dep_result.stderr)
+        logger.warning(
+            "pip install failed (exit %d): %s", dep_result.exit_code, dep_result.stderr
+        )
 
 
 _STAGE_TO_STATUS: dict[str, RunStatus] = {
@@ -93,7 +102,9 @@ async def start_agent_run(run_id: uuid.UUID, user_id: uuid.UUID, repo_url: str) 
     try:
         # Update run status
         await _update_run_status(run_id, RunStatus.agent_starting)
-        queue.put_nowait({"stage": "agent_starting", "message": "Starting secure sandbox..."})
+        queue.put_nowait(
+            {"stage": "agent_starting", "message": "Starting secure sandbox..."}
+        )
 
         # Create E2B desktop sandbox (sync SDK — run off event loop)
         sandbox = await asyncio.to_thread(
@@ -112,11 +123,13 @@ async def start_agent_run(run_id: uuid.UUID, user_id: uuid.UUID, repo_url: str) 
 
         stream_url = await asyncio.to_thread(_start_stream, sandbox)
         if stream_url:
-            queue.put_nowait({
-                "stage": "agent_starting",
-                "message": "Sandbox ready — live view active",
-                "stream_url": stream_url,
-            })
+            queue.put_nowait(
+                {
+                    "stage": "agent_starting",
+                    "message": "Sandbox ready — live view active",
+                    "stream_url": stream_url,
+                }
+            )
 
         # Upload agent code and install deps (works with any template)
         await _provision_agent(sandbox, queue)
@@ -163,9 +176,11 @@ async def start_agent_run(run_id: uuid.UUID, user_id: uuid.UUID, repo_url: str) 
         # Cancel the agent task if monitor finished first (e.g., completed/failed)
         agent_task.cancel()
 
-    except Exception as exc:
+    except Exception:
         logger.exception("Agent run %s failed", run_id)
-        await _update_run_status(run_id, RunStatus.failed, error="Agent run failed unexpectedly")
+        await _update_run_status(
+            run_id, RunStatus.failed, error="Agent run failed unexpectedly"
+        )
         queue.put_nowait({"stage": "error", "message": "Agent run failed unexpectedly"})
     finally:
         _cleanup(rid)
@@ -206,7 +221,9 @@ async def _monitor_agent(
                         if log_content.strip():
                             logger.info(
                                 "Run %s: agent.log after %ds:\n%s",
-                                run_id, elapsed, log_content[-2000:],
+                                run_id,
+                                elapsed,
+                                log_content[-2000:],
                             )
                     except Exception:
                         logger.info("Run %s: no agent.log after %ds", run_id, elapsed)
@@ -222,9 +239,15 @@ async def _monitor_agent(
                         pass
                     error_msg = "Agent failed to start within timeout"
                     if agent_log.strip():
-                        logger.error("Run %s startup timeout — log tail: %s", run_id, agent_log.strip()[-500:])
+                        logger.error(
+                            "Run %s startup timeout — log tail: %s",
+                            run_id,
+                            agent_log.strip()[-500:],
+                        )
                     else:
-                        logger.error("Run %s startup timeout — no agent.log found", run_id)
+                        logger.error(
+                            "Run %s startup timeout — no agent.log found", run_id
+                        )
                     await _update_run_status(run_id, RunStatus.failed, error=error_msg)
                     queue.put_nowait({"stage": "error", "message": error_msg})
                     return
@@ -244,7 +267,9 @@ async def _monitor_agent(
 
                 await _save_agent_output(run_id, result)
                 await _update_run_status(run_id, RunStatus.completed)
-                queue.put_nowait({"stage": "completed", "message": "Agent completed successfully"})
+                queue.put_nowait(
+                    {"stage": "completed", "message": "Agent completed successfully"}
+                )
                 return
 
             if status_data.get("status") == "failed":
@@ -281,11 +306,13 @@ async def _monitor_agent(
                     last_question_id = qid
                     _pending_questions[rid] = question
                     await _update_run_status(run_id, RunStatus.agent_awaiting_answer)
-                    queue.put_nowait({
-                        "stage": "awaiting_answer",
-                        "message": question.get("text", "Agent has a question"),
-                        "question": question,
-                    })
+                    queue.put_nowait(
+                        {
+                            "stage": "awaiting_answer",
+                            "message": question.get("text", "Agent has a question"),
+                            "question": question,
+                        }
+                    )
             except Exception:
                 pass
 

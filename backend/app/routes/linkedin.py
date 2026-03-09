@@ -69,9 +69,7 @@ def _consume_state(state: str, github_id: str) -> bool:
     return True
 
 
-async def _get_user_token(
-    user_id: uuid.UUID, session: AsyncSession
-) -> Token | None:
+async def _get_user_token(user_id: uuid.UUID, session: AsyncSession) -> Token | None:
     """Get the LinkedIn token for a user."""
     result = await session.execute(
         select(Token).where(Token.user_id == user_id, Token.platform == "linkedin")
@@ -79,13 +77,13 @@ async def _get_user_token(
     return result.scalar_one_or_none()
 
 
-async def _ensure_valid_token(
-    token: Token, session: AsyncSession
-) -> str:
+async def _ensure_valid_token(token: Token, session: AsyncSession) -> str:
     """Return a valid access token, refreshing if expired."""
     if token.expires_at and token.expires_at < datetime.now(timezone.utc):
         if not token.encrypted_refresh_token:
-            raise HTTPException(401, "LinkedIn token expired and no refresh token available")
+            raise HTTPException(
+                401, "LinkedIn token expired and no refresh token available"
+            )
         refresh_tok = decrypt_token(token.encrypted_refresh_token)
         data = await refresh_access_token(refresh_tok)
         token.encrypted_access_token = encrypt_token(data["access_token"])
@@ -132,14 +130,18 @@ async def handle_callback(
     existing = await _get_user_token(user.id, session)
     if existing:
         existing.encrypted_access_token = encrypt_token(access_token)
-        existing.encrypted_refresh_token = encrypt_token(refresh_token) if refresh_token else None
+        existing.encrypted_refresh_token = (
+            encrypt_token(refresh_token) if refresh_token else None
+        )
         existing.expires_at = expires_at
     else:
         token = Token(
             user_id=user.id,
             platform="linkedin",
             encrypted_access_token=encrypt_token(access_token),
-            encrypted_refresh_token=encrypt_token(refresh_token) if refresh_token else None,
+            encrypted_refresh_token=encrypt_token(refresh_token)
+            if refresh_token
+            else None,
             expires_at=expires_at,
         )
         session.add(token)
@@ -187,9 +189,7 @@ async def publish_draft(
     access_token = await _ensure_valid_token(token, session)
 
     # Fetch the draft
-    result = await session.execute(
-        select(Draft).where(Draft.id == body.draft_id)
-    )
+    result = await session.execute(select(Draft).where(Draft.id == body.draft_id))
     draft = result.scalar_one_or_none()
     if not draft:
         raise HTTPException(404, "Draft not found")
@@ -220,7 +220,9 @@ async def publish_draft(
             await create_comment(access_token, post_urn, draft.first_comment)
 
         # Build the post URL
-        post_url = f"https://www.linkedin.com/feed/update/{post_urn}" if post_urn else None
+        post_url = (
+            f"https://www.linkedin.com/feed/update/{post_urn}" if post_urn else None
+        )
 
         # Update draft status
         draft.status = DraftStatus.published
@@ -228,13 +230,22 @@ async def publish_draft(
         draft.published_at = datetime.now(timezone.utc)
         await session.commit()
 
-        log_publish_event(github_id=auth.github_id, draft_id=str(body.draft_id), success=True)
+        log_publish_event(
+            github_id=auth.github_id, draft_id=str(body.draft_id), success=True
+        )
         return PublishResponse(success=True, post_url=post_url)
 
     except Exception as exc:
         logger.error("Failed to publish draft %s: %s", body.draft_id, exc)
-        log_publish_event(github_id=auth.github_id, draft_id=str(body.draft_id), success=False, error=str(exc))
-        return PublishResponse(success=False, error="Failed to publish to LinkedIn. Please try again.")
+        log_publish_event(
+            github_id=auth.github_id,
+            draft_id=str(body.draft_id),
+            success=False,
+            error=str(exc),
+        )
+        return PublishResponse(
+            success=False, error="Failed to publish to LinkedIn. Please try again."
+        )
 
 
 @router.delete("/disconnect", status_code=204)

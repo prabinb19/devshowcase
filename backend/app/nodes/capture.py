@@ -52,24 +52,35 @@ async def capture(state: AgentState) -> dict[str, Any]:
             "run_id": run_id,
         }
 
-        writer({
-            "stage": "capturing",
-            "message": f"Using {strategy} strategy…",
-        })
+        writer(
+            {
+                "stage": "capturing",
+                "message": f"Using {strategy} strategy…",
+            }
+        )
 
         screenshots: list[dict] = []
 
         if strategy == "readme_images":
             image_urls = repo_context.get("images_in_readme", [])
-            screenshots = capture_readme_images(image_urls, repo_context.get("url", ""), run_id)
+            screenshots = capture_readme_images(
+                image_urls, repo_context.get("url", ""), run_id
+            )
             # Fallback to project card if no valid images were captured
             if not screenshots:
                 logger.info("No valid README images, falling back to project card")
                 screenshots = generate_project_card(**card_kwargs)
 
         elif strategy == "sandbox":
+
             def _emit_stream_url(url: str) -> None:
-                writer({"stage": "capturing", "message": "Live sandbox preview available", "stream_url": url})
+                writer(
+                    {
+                        "stage": "capturing",
+                        "message": "Live sandbox preview available",
+                        "stream_url": url,
+                    }
+                )
 
             sandbox_kwargs = {
                 **card_kwargs,
@@ -80,9 +91,17 @@ async def capture(state: AgentState) -> dict[str, Any]:
                 "on_stream_url": _emit_stream_url,
             }
             screenshots = capture_sandbox_screenshot(**sandbox_kwargs)
-            writer({"stage": "capturing", "message": "Screenshot captured", "stream_url": None})
+            writer(
+                {
+                    "stage": "capturing",
+                    "message": "Screenshot captured",
+                    "stream_url": None,
+                }
+            )
             if not screenshots:
-                logger.info("Sandbox capture returned no screenshots, falling back to project card")
+                logger.info(
+                    "Sandbox capture returned no screenshots, falling back to project card"
+                )
                 screenshots = generate_project_card(**card_kwargs)
 
         else:  # "project_card" or any default

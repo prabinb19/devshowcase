@@ -94,7 +94,9 @@ class Draft(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
     )
-    platform: Mapped[str] = mapped_column(String, default="linkedin", server_default="linkedin")
+    platform: Mapped[str] = mapped_column(
+        String, default="linkedin", server_default="linkedin"
+    )
     body: Mapped[str] = mapped_column(Text, nullable=False)
     first_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     screenshot_urls: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -121,7 +123,9 @@ class Draft(Base):
 
 class Token(Base):
     __tablename__ = "tokens"
-    __table_args__ = (UniqueConstraint("user_id", "platform", name="uq_tokens_user_platform"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "platform", name="uq_tokens_user_platform"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()

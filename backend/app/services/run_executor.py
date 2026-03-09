@@ -16,9 +16,7 @@ from app.nodes.generate import generate
 logger = logging.getLogger(__name__)
 
 
-async def execute_graph(
-    run_id: uuid.UUID, user_id: uuid.UUID, repo_url: str
-) -> None:
+async def execute_graph(run_id: uuid.UUID, user_id: uuid.UUID, repo_url: str) -> None:
     """Execute the LangGraph pipeline for a run. Called via asyncio.create_task()."""
     if app.graph.compiled_graph is None:
         logger.error("Graph not initialized — cannot execute run %s", run_id)
@@ -63,7 +61,7 @@ async def execute_graph(
 
             await session.commit()
 
-    except Exception as exc:
+    except Exception:
         logger.exception("Unhandled error in run %s", run_id)
         async with async_session() as session:
             result = await session.execute(select(Run).where(Run.id == run_id))
@@ -108,7 +106,7 @@ async def execute_graph_from_generate(
 
             await session.commit()
 
-    except Exception as exc:
+    except Exception:
         logger.exception("Unhandled error in regenerate run %s", run_id)
         async with async_session() as session:
             db_result = await session.execute(select(Run).where(Run.id == run_id))

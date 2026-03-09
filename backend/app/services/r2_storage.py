@@ -50,8 +50,6 @@ def upload_image(
         ContentType=content_type,
     )
 
-    public_url = (
-        f"https://{settings.r2_bucket_name}.r2.dev/{key}"
-    )
+    public_url = f"https://{settings.r2_bucket_name}.r2.dev/{key}"
     logger.info("Uploaded %s to R2: %s", filename, public_url)
     return public_url

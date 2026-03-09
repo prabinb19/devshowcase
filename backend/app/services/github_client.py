@@ -17,13 +17,15 @@ _GITHUB_URL_RE = re.compile(
     r"^https?://github\.com/(?P<owner>[A-Za-z0-9_.-]+)/(?P<repo>[A-Za-z0-9_.-]+?)(?:\.git)?/?$"
 )
 
-_CONFIG_FILENAMES = frozenset({
-    "package.json",
-    "pyproject.toml",
-    "Cargo.toml",
-    "go.mod",
-    "requirements.txt",
-})
+_CONFIG_FILENAMES = frozenset(
+    {
+        "package.json",
+        "pyproject.toml",
+        "Cargo.toml",
+        "go.mod",
+        "requirements.txt",
+    }
+)
 
 _MAX_TREE_ENTRIES = 10_000
 _MAX_CONFIG_SIZE = 50 * 1024  # 50 KB
@@ -153,9 +155,7 @@ async def fetch_config_files(
     configs: dict[str, str] = {}
 
     for filename in present:
-        resp = await client.get(
-            f"/repos/{owner}/{repo}/contents/{filename}"
-        )
+        resp = await client.get(f"/repos/{owner}/{repo}/contents/{filename}")
         if resp.status_code != 200:
             continue
         data = resp.json()

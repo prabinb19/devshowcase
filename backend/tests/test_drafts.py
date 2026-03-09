@@ -1,4 +1,5 @@
 """Tests for the drafts API endpoints."""
+
 from __future__ import annotations
 
 import uuid
@@ -15,9 +16,7 @@ from app.routes.deps import verify_auth
 from tests.conftest import make_fake_auth
 
 
-def _make_mock_session(
-    *, execute_return=None
-) -> AsyncMock:
+def _make_mock_session(*, execute_return=None) -> AsyncMock:
     """Build a mock AsyncSession with configurable query results."""
     session = AsyncMock()
     session.add = MagicMock()
@@ -67,9 +66,7 @@ async def client():
         yield c
 
 
-async def test_create_draft(
-    client: AsyncClient, user_id: uuid.UUID, run_id: uuid.UUID
-):
+async def test_create_draft(client: AsyncClient, user_id: uuid.UUID, run_id: uuid.UUID):
     """POST /api/drafts creates a draft and returns 201."""
     from app.main import app
 

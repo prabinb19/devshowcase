@@ -172,13 +172,15 @@ def capture_sandbox_screenshot(
         url = upload_image(processed, run_id, "sandbox_screenshot.png")
 
         logger.info("Sandbox screenshot uploaded: %s", url)
-        return [{
-            "url": url,
-            "alt_text": f"Screenshot of {name} running in sandbox",
-            "source": "sandbox",
-            "width": width,
-            "height": height,
-        }]
+        return [
+            {
+                "url": url,
+                "alt_text": f"Screenshot of {name} running in sandbox",
+                "source": "sandbox",
+                "width": width,
+                "height": height,
+            }
+        ]
 
     except Exception as exc:
         logger.error("Sandbox screenshot failed: %s", exc)

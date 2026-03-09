@@ -24,12 +24,14 @@ SCOPES = "w_member_social openid profile"
 _MAX_RETRIES = 3
 _BASE_DELAY = 1.0
 
-_BLOCKED_HOSTS = frozenset({
-    "metadata.google.internal",
-    "169.254.169.254",
-    "metadata.azure.com",
-    "100.100.100.200",
-})
+_BLOCKED_HOSTS = frozenset(
+    {
+        "metadata.google.internal",
+        "169.254.169.254",
+        "metadata.azure.com",
+        "100.100.100.200",
+    }
+)
 
 
 def _validate_image_url(url: str) -> None:
@@ -43,7 +45,9 @@ def _validate_image_url(url: str) -> None:
     if hostname in _BLOCKED_HOSTS:
         raise ValueError(f"Blocked host: {hostname}")
     try:
-        for info in socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM):
+        for info in socket.getaddrinfo(
+            hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM
+        ):
             addr = info[4][0]
             ip = ipaddress.ip_address(addr)
             if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
@@ -64,10 +68,15 @@ async def _request_with_retry(
         if response.status_code < 500 and response.status_code != 429:
             return response
         if attempt < _MAX_RETRIES - 1:
-            delay = _BASE_DELAY * (2 ** attempt)
+            delay = _BASE_DELAY * (2**attempt)
             logger.warning(
                 "LinkedIn API %s %s returned %d, retrying in %.1fs (attempt %d/%d)",
-                method, url, response.status_code, delay, attempt + 1, _MAX_RETRIES,
+                method,
+                url,
+                response.status_code,
+                delay,
+                attempt + 1,
+                _MAX_RETRIES,
             )
             await asyncio.sleep(delay)
     return response
@@ -153,9 +162,7 @@ async def get_linkedin_profile(access_token: str) -> str:
         return f"urn:li:person:{data['sub']}"
 
 
-async def upload_image(
-    access_token: str, author_urn: str, image_url: str
-) -> str:
+async def upload_image(access_token: str, author_urn: str, image_url: str) -> str:
     """Upload an image to LinkedIn via the 2-step process.
 
     1. Initialize the upload to get an upload URL and image URN.
@@ -255,9 +262,7 @@ async def create_post(
         return {"post_urn": post_urn, "status_code": response.status_code}
 
 
-async def create_comment(
-    access_token: str, post_urn: str, text: str
-) -> dict:
+async def create_comment(access_token: str, post_urn: str, text: str) -> dict:
     """Create a comment on a LinkedIn post (e.g. first comment with GitHub link)."""
     async with httpx.AsyncClient() as client:
         response = await _request_with_retry(

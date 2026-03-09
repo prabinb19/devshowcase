@@ -12,7 +12,7 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 from app.database import get_session
-from app.models import Run, RunStatus, User
+from app.models import Run, RunStatus
 from app.routes.deps import verify_auth
 from tests.conftest import make_fake_auth
 
@@ -61,9 +61,7 @@ def completed_run(user_id: uuid.UUID) -> Run:
     )
 
 
-def _make_mock_session(
-    *, execute_return=None, scalar_one_or_none=None
-) -> AsyncMock:
+def _make_mock_session(*, execute_return=None, scalar_one_or_none=None) -> AsyncMock:
     """Build a mock AsyncSession with configurable query results."""
     session = AsyncMock()
     session.add = MagicMock()
@@ -90,7 +88,9 @@ async def test_create_run_returns_202(
     from app.main import app
 
     run_id = uuid.uuid4()
-    fake_auth = make_fake_auth(github_id=github_id, github_username=github_username, user_id=user_id)
+    fake_auth = make_fake_auth(
+        github_id=github_id, github_username=github_username, user_id=user_id
+    )
 
     session = _make_mock_session()
 
@@ -218,9 +218,7 @@ async def test_agent_answer_rejects_oversized_text(
     assert response.status_code == 422
 
 
-async def test_rate_limit_returns_429(
-    client: AsyncClient, github_id: str
-):
+async def test_rate_limit_returns_429(client: AsyncClient, github_id: str):
     """POST /api/runs returns 429 after rate limit is exceeded."""
     # Build a valid JWT so the rate limiter middleware can extract github_id
     test_secret = "test-secret-for-rate-limit"

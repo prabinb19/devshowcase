@@ -37,6 +37,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         async with async_session() as session:
             # Count recent runs by looking up the user's UUID from github_id
             from app.models import User
+
             user_result = await session.execute(
                 select(User.id).where(User.github_id == github_id)
             )

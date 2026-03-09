@@ -92,9 +92,7 @@ def _build_tool_schema() -> dict[str, Any]:
         for k, v in schema.get("properties", {}).items()
         if k != "screenshot_strategy"
     }
-    required = [
-        f for f in schema.get("required", []) if f != "screenshot_strategy"
-    ]
+    required = [f for f in schema.get("required", []) if f != "screenshot_strategy"]
     return {
         "name": "extract_project_analysis",
         "description": "Extract structured project analysis from repo data.",

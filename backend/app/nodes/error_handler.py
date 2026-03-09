@@ -25,9 +25,7 @@ async def handle_error(state: AgentState) -> dict[str, Any]:
 
     if run_id:
         async with async_session() as session:
-            result = await session.execute(
-                select(Run).where(Run.id == run_id)
-            )
+            result = await session.execute(select(Run).where(Run.id == run_id))
             run = result.scalar_one_or_none()
             if run:
                 run.status = RunStatus.failed

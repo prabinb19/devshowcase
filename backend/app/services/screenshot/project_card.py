@@ -25,7 +25,9 @@ _MUTED_COLOR = (148, 163, 184)  # Slate-400
 _TAG_BG = (51, 65, 85)  # Slate-700
 
 
-def _get_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+def _get_font(
+    size: int, bold: bool = False
+) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     """Try system fonts, fall back to Pillow default."""
     font_names = (
         ["DejaVuSans-Bold", "Helvetica-Bold", "Arial-Bold"]

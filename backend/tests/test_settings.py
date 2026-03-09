@@ -1,11 +1,11 @@
 """Tests for the settings API endpoints."""
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
@@ -25,7 +25,9 @@ def _make_mock_session(*, execute_return=None) -> AsyncMock:
     return session
 
 
-def _make_user(*, preferences: dict | None = None, user_id: uuid.UUID | None = None) -> MagicMock:
+def _make_user(
+    *, preferences: dict | None = None, user_id: uuid.UUID | None = None
+) -> MagicMock:
     """Create a mock User with optional preferences."""
     user = MagicMock()
     user.id = user_id or uuid.uuid4()

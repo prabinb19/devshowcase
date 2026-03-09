@@ -1,4 +1,5 @@
 """Reusable FastAPI dependencies — JWT auth + user resolution."""
+
 from __future__ import annotations
 
 import logging
@@ -35,9 +36,7 @@ async def get_or_create_user(
     Handles the race condition where two concurrent requests for the same
     github_id both pass the SELECT and attempt INSERT.
     """
-    result = await session.execute(
-        select(User).where(User.github_id == github_id)
-    )
+    result = await session.execute(select(User).where(User.github_id == github_id))
     user = result.scalar_one_or_none()
     if user:
         return user
@@ -47,9 +46,7 @@ async def get_or_create_user(
         await session.commit()
     except IntegrityError:
         await session.rollback()
-        result = await session.execute(
-            select(User).where(User.github_id == github_id)
-        )
+        result = await session.execute(select(User).where(User.github_id == github_id))
         user = result.scalar_one()
         return user
     await session.refresh(user)
@@ -72,12 +69,16 @@ async def verify_auth(
 
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
-        log_auth_event(action="missing_header", success=False, reason="no bearer", ip=client_ip)
+        log_auth_event(
+            action="missing_header", success=False, reason="no bearer", ip=client_ip
+        )
         raise HTTPException(401, "Missing or invalid Authorization header")
 
     token = auth_header.removeprefix("Bearer ").strip()
     if not token:
-        log_auth_event(action="empty_token", success=False, reason="empty bearer", ip=client_ip)
+        log_auth_event(
+            action="empty_token", success=False, reason="empty bearer", ip=client_ip
+        )
         raise HTTPException(401, "Empty bearer token")
 
     secret = settings.nextauth_secret
@@ -95,10 +96,14 @@ async def verify_auth(
         raise HTTPException(401, "Invalid token")
 
     github_id = payload.get("githubId") or payload.get("github_id") or ""
-    github_username = payload.get("githubUsername") or payload.get("github_username") or ""
+    github_username = (
+        payload.get("githubUsername") or payload.get("github_username") or ""
+    )
 
     if not github_id:
-        log_auth_event(action="missing_claim", success=False, reason="no githubId", ip=client_ip)
+        log_auth_event(
+            action="missing_claim", success=False, reason="no githubId", ip=client_ip
+        )
         raise HTTPException(401, "Token missing githubId claim")
 
     db_user = await get_or_create_user(str(github_id), str(github_username), session)

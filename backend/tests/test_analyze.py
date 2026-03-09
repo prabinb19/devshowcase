@@ -5,8 +5,6 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 from app.nodes.analyze import (
     _build_tool_schema,
     _cap_file_tree,
@@ -99,22 +97,21 @@ class TestDetermineScreenshotStrategy:
 
     def test_has_images_returns_readme_images(self) -> None:
         assert (
-            _determine_screenshot_strategy("cli", False, ["img.png"])
-            == "readme_images"
+            _determine_screenshot_strategy("cli", False, ["img.png"]) == "readme_images"
         )
 
     def test_fallback_returns_project_card(self) -> None:
         assert _determine_screenshot_strategy("none", False, []) == "project_card"
 
     def test_web_takes_priority_over_images(self) -> None:
-        assert (
-            _determine_screenshot_strategy("web", True, ["img.png"]) == "sandbox"
-        )
+        assert _determine_screenshot_strategy("web", True, ["img.png"]) == "sandbox"
 
     def test_case_insensitive_visual_type(self) -> None:
         assert _determine_screenshot_strategy("Web", False, []) == "sandbox"
         assert _determine_screenshot_strategy("WEB", False, []) == "sandbox"
-        assert _determine_screenshot_strategy("CLI", False, ["img.png"]) == "readme_images"
+        assert (
+            _determine_screenshot_strategy("CLI", False, ["img.png"]) == "readme_images"
+        )
 
 
 # ── Tool schema tests ──

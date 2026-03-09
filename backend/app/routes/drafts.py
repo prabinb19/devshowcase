@@ -1,4 +1,5 @@
 """API endpoints for managing post drafts."""
+
 from __future__ import annotations
 
 import uuid
