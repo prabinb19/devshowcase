@@ -74,6 +74,7 @@ export interface CreateRunRequest {
 export interface RunResponse {
   run_id: string;
   status: RunStatus;
+  stream_token: string;
 }
 
 export interface SSEEvent {

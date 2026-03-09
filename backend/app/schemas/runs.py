@@ -17,6 +17,7 @@ class CreateRunRequest(BaseModel):
 class RunResponse(BaseModel):
     run_id: uuid.UUID
     status: RunStatus
+    stream_token: str
 
 
 class RunDetailResponse(BaseModel):

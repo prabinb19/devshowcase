@@ -38,7 +38,7 @@ export default function DashboardPage() {
     setLoading(true);
     try {
       const data = await createRun(trimmed);
-      router.push(`/runs/${data.run_id}`);
+      router.push(`/runs/${data.run_id}?st=${encodeURIComponent(data.stream_token)}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create run");
       setLoading(false);

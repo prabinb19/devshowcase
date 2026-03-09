@@ -117,6 +117,8 @@ async def test_create_run_returns_202(
     data = response.json()
     assert "run_id" in data
     assert data["status"] == "pending"
+    assert "stream_token" in data
+    assert len(data["stream_token"]) > 0
 
 
 async def test_get_run_not_found(client: AsyncClient):
@@ -166,6 +168,54 @@ async def test_get_run_found(client: AsyncClient, user_id: uuid.UUID, sample_run
     data = response.json()
     assert data["repo_url"] == "https://github.com/test/repo"
     assert data["status"] == "pending"
+
+
+async def test_stream_requires_token(client: AsyncClient):
+    """GET /api/runs/{id}/stream without token returns 422."""
+    run_id = uuid.uuid4()
+    response = await client.get(f"/api/runs/{run_id}/stream")
+    assert response.status_code == 422
+
+
+async def test_stream_rejects_invalid_token(client: AsyncClient):
+    """GET /api/runs/{id}/stream with bad JWT returns 401."""
+    run_id = uuid.uuid4()
+    response = await client.get(f"/api/runs/{run_id}/stream?token=invalid.jwt.token")
+    assert response.status_code == 401
+
+
+async def test_stream_rejects_mismatched_run_id(client: AsyncClient):
+    """GET /api/runs/{id}/stream with token for different run returns 403."""
+    from app.routes.runs import _create_stream_token
+
+    run_id = uuid.uuid4()
+    other_run_id = uuid.uuid4()
+    user_id = uuid.uuid4()
+    token = _create_stream_token(other_run_id, user_id)
+
+    response = await client.get(f"/api/runs/{run_id}/stream?token={token}")
+    assert response.status_code == 403
+
+
+async def test_agent_answer_rejects_oversized_text(
+    client: AsyncClient, user_id: uuid.UUID
+):
+    """POST /api/runs/{id}/answer with text > 10000 chars returns 422."""
+    from app.main import app
+
+    fake_auth = make_fake_auth(user_id=user_id)
+
+    run_id = uuid.uuid4()
+    app.dependency_overrides[verify_auth] = lambda: fake_auth
+    try:
+        response = await client.post(
+            f"/api/runs/{run_id}/answer",
+            json={"text": "x" * 10_001},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 422
 
 
 async def test_rate_limit_returns_429(

@@ -32,7 +32,7 @@ async function apiFetch<T>(
 
 // Runs — authenticated via proxy (no more X-GitHub-* headers)
 export function createRun(repoUrl: string) {
-  return apiFetch<{ run_id: string; status: string }>("/api/runs", {
+  return apiFetch<{ run_id: string; status: string; stream_token: string }>("/api/runs", {
     method: "POST",
     body: JSON.stringify({ repo_url: repoUrl }),
   });
@@ -50,8 +50,12 @@ export function answerAgentQuestion(runId: string, text: string) {
 }
 
 // SSE stream URL — direct to backend (not proxied)
-export function getSSEUrl(runId: string) {
-  return `${DIRECT_API_BASE}/api/runs/${runId}/stream`;
+export function getSSEUrl(runId: string, streamToken?: string) {
+  const base = `${DIRECT_API_BASE}/api/runs/${runId}/stream`;
+  if (streamToken) {
+    return `${base}?token=${encodeURIComponent(streamToken)}`;
+  }
+  return base;
 }
 
 // Drafts — authenticated via proxy

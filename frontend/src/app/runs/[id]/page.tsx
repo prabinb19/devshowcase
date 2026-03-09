@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { Navbar } from "@/components/navbar";
 import { Button } from "@/components/ui/button";
@@ -126,9 +126,11 @@ function QuestionDialog({
 export default function RunStatusPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = params.id as string;
+  const streamToken = searchParams.get("st") ?? undefined;
 
-  const { events, isDone, error: sseError, streamUrl, pendingQuestion, clearQuestion } = useSSE(getSSEUrl(id));
+  const { events, isDone, error: sseError, streamUrl, pendingQuestion, clearQuestion } = useSSE(getSSEUrl(id, streamToken));
   const { data: run } = useSWR(`/run/${id}`, () => getRun(id), {
     refreshInterval: 3000,
   });
