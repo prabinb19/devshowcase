@@ -4,9 +4,9 @@
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12+-3776AB.svg)](https://python.org)
 [![Next.js 14](https://img.shields.io/badge/Next.js-14-black.svg)](https://nextjs.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com)
-[![Tests](https://img.shields.io/badge/Tests-139_passing-brightgreen.svg)](#running-tests)
+[![Tests](https://img.shields.io/badge/Tests-151_passing-brightgreen.svg)](#running-tests)
 
-An AI agent app I built to learn how to secure self-hosted agent runtimes, using the security domains from [Microsoft's analysis of OpenClaw](https://www.microsoft.com/en-us/security/blog/2026/02/19/running-openclaw-safely-identity-isolation-runtime-risk/) as a checklist.
+An AI agent app I built to learn how to secure self-hosted agent runtimes. I used three Microsoft security frameworks as checklists: the [OpenClaw threat analysis](https://www.microsoft.com/en-us/security/blog/2026/02/19/running-openclaw-safely-identity-isolation-runtime-risk/) (6 control domains), the [Security Development Lifecycle](https://www.microsoft.com/en-us/securityengineering/sdl/practices) (SDL), and the [Responsible AI Standard v2](https://www.microsoft.com/en-us/ai/principles-and-approach).
 
 ## Background
 
@@ -14,13 +14,17 @@ I have been learning to build with AI agents recently and it is genuinely fun. V
 
 That got me thinking. I found [this Microsoft article](https://www.microsoft.com/en-us/security/blog/2026/02/19/running-openclaw-safely-identity-isolation-runtime-risk/) where Microsoft Defender's security research team analyzes the risks of OpenClaw, a third-party self-hosted agent runtime. Their main point is that OpenClaw is not safe to run. It can ingest untrusted text, download and execute code from external sources, and act using whatever credentials you give it. Microsoft recommends not running it at all, or if you must, only in a fully isolated environment with dedicated credentials.
 
-The article is not a how-to guide. It is a threat analysis with hunting queries for Microsoft Defender XDR. But buried in there is a table that maps six security control domains (Identity, Endpoint & Host, Supply Chain, Network & Egress, Data Protection, Monitoring & Response) to concrete risks. I used those six domains as a checklist for my own project.
+The article is not a how-to guide. It is a threat analysis with hunting queries for Microsoft Defender XDR. But buried in there is a table that maps six security control domains (Identity, Endpoint & Host, Supply Chain, Network & Egress, Data Protection, Monitoring & Response) to concrete risks. I used those six domains as a starting point, then expanded into two more Microsoft frameworks — the SDL for secure coding practices and the Responsible AI Standard for AI-specific safety.
 
 The app itself takes a GitHub repo URL, runs it through an AI pipeline (analyze the code, capture screenshots, generate a LinkedIn post), and lets you publish it. The interesting part was going back through my own code and finding all the security holes. There were a lot.
 
-## What I Learned (9 Security Fixes)
+## Security Frameworks Applied
 
-The Microsoft article identifies 6 control domains for securing agent runtimes. I went through my own code and implemented fixes that cover all 6.
+This project is hardened against three Microsoft security frameworks. Full implementation details are in [docs/security-hardening.md](docs/security-hardening.md).
+
+### 1. Microsoft OpenClaw Threat Analysis — 6 Control Domains
+
+The [Microsoft Defender team's threat analysis](https://www.microsoft.com/en-us/security/blog/2026/02/19/running-openclaw-safely-identity-isolation-runtime-risk/) identifies six control domains for securing self-hosted agent runtimes. I implemented fixes that cover all six.
 
 | # | Fix | Domain | What was wrong |
 |---|-----|--------|----------------|
@@ -34,17 +38,34 @@ The Microsoft article identifies 6 control domains for securing agent runtimes. 
 | 8 | Dependency Pinning | Supply Chain | Dependencies had no version constraints. Pinned everything to prevent malicious package injection |
 | 9 | Structured Audit Logging | Monitoring | No way to tell if credentials were compromised. Added JSON audit logs for auth, publish, and token events |
 
+### 2. Microsoft Security Development Lifecycle (SDL)
 
-### Microsoft Security Domain Coverage
+The [SDL](https://www.microsoft.com/en-us/securityengineering/sdl/practices) defines secure coding practices across requirements, design, implementation, verification, and release. The OpenClaw fixes cover a lot of SDL ground, but two areas had gaps: browser-side security headers and overly permissive CORS.
+
+| # | Fix | SDL Phase | What changed |
+|---|-----|-----------|--------------|
+| 10 | Content-Security-Policy & Security Headers | Implementation | Added CSP with allowlisted sources, X-Frame-Options DENY, X-Content-Type-Options nosniff, strict Referrer-Policy, and Permissions-Policy disabling camera/mic/geo |
+| 11 | CORS Hardening | Design | Replaced `allow_methods=["*"]` and `allow_headers=["*"]` with explicit allowlists: only the HTTP methods and headers the app actually uses |
+
+### 3. Microsoft Responsible AI Standard v2
+
+The [Responsible AI Standard](https://www.microsoft.com/en-us/ai/principles-and-approach) defines six principles: fairness, reliability & safety, privacy & security, inclusiveness, transparency, and accountability. Two gaps stood out — no content safety filtering on LLM output, and no disclosure that content is AI-generated.
+
+| # | Fix | RAI Principle | What changed |
+|---|-----|---------------|--------------|
+| 12 | LLM Output Content Safety Filter | Reliability & Safety | Added a blocklist that catches violent language, hateful content, credential leaks, prompt injection echoes, role hijack echoes, and system prompt leaks before storing any AI-generated draft |
+| 13 | AI Transparency Disclosure | Transparency | Added an "AI-Generated Content" banner on the review page with a link to Microsoft's Responsible AI principles. Also aligns with the [AI Code of Conduct](https://learn.microsoft.com/en-us/legal/ai-code-of-conduct) (no deceptive AI content) |
+
+### Coverage Summary
 
 | Domain | Fixes |
 |--------|-------|
-| Identity | JWT auth, ownership checks, OAuth state |
-| Endpoint & Host | Sandbox secrets scoping |
-| Supply Chain | Dependency pinning |
-| Network & Egress | SSRF prevention |
-| Data Protection | Prompt injection defense, error sanitization |
-| Monitoring & Response | Structured audit logging |
+| **Identity** | JWT auth (#1), ownership checks (#2), OAuth state (#3) |
+| **Endpoint & Host** | Sandbox secrets scoping (#5) |
+| **Supply Chain** | Dependency pinning (#8) |
+| **Network & Egress** | SSRF prevention (#6), CSP headers (#10), CORS hardening (#11) |
+| **Data Protection** | Prompt injection defense (#4), error sanitization (#7), content safety filter (#12), AI disclosure (#13) |
+| **Monitoring & Response** | Structured audit logging (#9) |
 
 ## How the App Works
 
@@ -135,12 +156,12 @@ cd backend
 .venv/bin/python -m pytest tests/ -v
 ```
 
-139 tests covering pipeline nodes, API routes, security controls, and services. All mocked, no API keys needed.
+151 tests covering pipeline nodes, API routes, security controls, and services. All mocked, no API keys needed.
 
 Security-specific tests:
 
 ```bash
-.venv/bin/python -m pytest tests/ -v -k "auth or forbidden or state or ssrf or audit or error"
+.venv/bin/python -m pytest tests/ -v -k "auth or forbidden or state or ssrf or audit or error or content_safety"
 ```
 
 ## Deployment
@@ -151,7 +172,11 @@ Security-specific tests:
 
 ## References
 
-- [Microsoft: Running OpenClaw Safely](https://www.microsoft.com/en-us/security/blog/2026/02/19/running-openclaw-safely-identity-isolation-runtime-risk/) - the threat analysis I used as a security checklist
+- [Microsoft: Running OpenClaw Safely](https://www.microsoft.com/en-us/security/blog/2026/02/19/running-openclaw-safely-identity-isolation-runtime-risk/) — the threat analysis I used as the initial security checklist (6 control domains)
+- [Microsoft Security Development Lifecycle (SDL)](https://www.microsoft.com/en-us/securityengineering/sdl/practices) — secure coding practices across the development lifecycle
+- [Microsoft Responsible AI Standard v2](https://www.microsoft.com/en-us/ai/principles-and-approach) — six principles for ethical AI (fairness, reliability, privacy, inclusiveness, transparency, accountability)
+- [Microsoft AI Code of Conduct](https://learn.microsoft.com/en-us/legal/ai-code-of-conduct) — requirements for AI services, aligned with EU AI Act
+- [Microsoft SDL for AI (Feb 2026)](https://www.microsoft.com/en-us/security/blog/2026/02/03/microsoft-sdl-evolving-security-practices-for-an-ai-powered-world/) — how Microsoft is evolving SDL for AI-specific threats
 
 ## License
 
