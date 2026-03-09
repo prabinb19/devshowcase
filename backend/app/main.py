@@ -3,8 +3,9 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.middleware.rate_limit import RateLimitMiddleware
@@ -33,6 +34,17 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="DevShowcase API", version="0.1.0", lifespan=lifespan)
+
+MAX_REQUEST_BODY_BYTES = 1_048_576  # 1 MB
+
+
+@app.middleware("http")
+async def limit_request_size(request: Request, call_next):
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > MAX_REQUEST_BODY_BYTES:
+        return JSONResponse(status_code=413, content={"detail": "Request body too large"})
+    return await call_next(request)
+
 
 app.add_middleware(
     CORSMiddleware,

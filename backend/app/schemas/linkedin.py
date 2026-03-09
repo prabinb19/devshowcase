@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 from pydantic import BaseModel
 
 
@@ -20,7 +22,7 @@ class LinkedInTokenStatus(BaseModel):
 
 
 class PublishRequest(BaseModel):
-    draft_id: str
+    draft_id: uuid.UUID
 
 
 class PublishResponse(BaseModel):

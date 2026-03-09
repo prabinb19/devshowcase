@@ -188,7 +188,7 @@ async def publish_draft(
 
     # Fetch the draft
     result = await session.execute(
-        select(Draft).where(Draft.id == uuid.UUID(body.draft_id))
+        select(Draft).where(Draft.id == body.draft_id)
     )
     draft = result.scalar_one_or_none()
     if not draft:
@@ -228,12 +228,12 @@ async def publish_draft(
         draft.published_at = datetime.now(timezone.utc)
         await session.commit()
 
-        log_publish_event(github_id=auth.github_id, draft_id=body.draft_id, success=True)
+        log_publish_event(github_id=auth.github_id, draft_id=str(body.draft_id), success=True)
         return PublishResponse(success=True, post_url=post_url)
 
     except Exception as exc:
         logger.error("Failed to publish draft %s: %s", body.draft_id, exc)
-        log_publish_event(github_id=auth.github_id, draft_id=body.draft_id, success=False, error=str(exc))
+        log_publish_event(github_id=auth.github_id, draft_id=str(body.draft_id), success=False, error=str(exc))
         return PublishResponse(success=False, error="Failed to publish to LinkedIn. Please try again.")
 
 
