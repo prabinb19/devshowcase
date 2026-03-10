@@ -32,18 +32,18 @@ async function apiFetch<T>(
 
 // Runs — authenticated via proxy (no more X-GitHub-* headers)
 export function createRun(repoUrl: string) {
-  return apiFetch<{ run_id: string; status: string; stream_token: string }>("/api/runs", {
+  return apiFetch<{ run_id: string; status: string; stream_token: string }>("/runs", {
     method: "POST",
     body: JSON.stringify({ repo_url: repoUrl }),
   });
 }
 
 export function getRun(runId: string) {
-  return apiFetch<import("@/types").RunDetail>(`/api/runs/${runId}`);
+  return apiFetch<import("@/types").RunDetail>(`/runs/${runId}`);
 }
 
 export function answerAgentQuestion(runId: string, text: string) {
-  return apiFetch<void>(`/api/runs/${runId}/answer`, {
+  return apiFetch<void>(`/runs/${runId}/answer`, {
     method: "POST",
     body: JSON.stringify({ text }),
   });
@@ -60,67 +60,67 @@ export function getSSEUrl(runId: string, streamToken?: string) {
 
 // Drafts — authenticated via proxy
 export function createDraft(data: import("@/types").CreateDraftRequest) {
-  return apiFetch<import("@/types").Draft>("/api/drafts", {
+  return apiFetch<import("@/types").Draft>("/drafts", {
     method: "POST",
     body: JSON.stringify(data),
   });
 }
 
 export function listDrafts() {
-  return apiFetch<import("@/types").Draft[]>("/api/drafts");
+  return apiFetch<import("@/types").Draft[]>("/drafts");
 }
 
 export function getDraft(draftId: string) {
-  return apiFetch<import("@/types").Draft>(`/api/drafts/${draftId}`);
+  return apiFetch<import("@/types").Draft>(`/drafts/${draftId}`);
 }
 
 export function updateDraft(
   draftId: string,
   data: import("@/types").UpdateDraftRequest
 ) {
-  return apiFetch<import("@/types").Draft>(`/api/drafts/${draftId}`, {
+  return apiFetch<import("@/types").Draft>(`/drafts/${draftId}`, {
     method: "PATCH",
     body: JSON.stringify(data),
   });
 }
 
 export function deleteDraft(draftId: string) {
-  return apiFetch<void>(`/api/drafts/${draftId}`, { method: "DELETE" });
+  return apiFetch<void>(`/drafts/${draftId}`, { method: "DELETE" });
 }
 
 // LinkedIn — authenticated via proxy
 export function getLinkedInAuthUrl() {
-  return apiFetch<{ auth_url: string }>("/api/linkedin/auth-url");
+  return apiFetch<{ auth_url: string }>("/linkedin/auth-url");
 }
 
 export function getLinkedInStatus() {
-  return apiFetch<import("@/types").LinkedInStatus>("/api/linkedin/status");
+  return apiFetch<import("@/types").LinkedInStatus>("/linkedin/status");
 }
 
 export function publishToLinkedIn(draftId: string) {
-  return apiFetch<import("@/types").PublishResponse>("/api/linkedin/publish", {
+  return apiFetch<import("@/types").PublishResponse>("/linkedin/publish", {
     method: "POST",
     body: JSON.stringify({ draft_id: draftId }),
   });
 }
 
 export function disconnectLinkedIn() {
-  return apiFetch<void>("/api/linkedin/disconnect", { method: "DELETE" });
+  return apiFetch<void>("/linkedin/disconnect", { method: "DELETE" });
 }
 
 export function listDraftsByStatus(status: string) {
   return apiFetch<import("@/types").Draft[]>(
-    `/api/drafts?status=${status}`
+    `/drafts?status=${status}`
   );
 }
 
 // Settings — authenticated via proxy
 export function getUserSettings() {
-  return apiFetch<import("@/types").UserSettings>("/api/settings");
+  return apiFetch<import("@/types").UserSettings>("/settings");
 }
 
 export function updateUserSettings(data: import("@/types").UserSettings) {
-  return apiFetch<import("@/types").UserSettings>("/api/settings", {
+  return apiFetch<import("@/types").UserSettings>("/settings", {
     method: "PUT",
     body: JSON.stringify(data),
   });
