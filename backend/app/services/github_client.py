@@ -181,8 +181,13 @@ def _is_badge_url(url: str) -> bool:
     path_lower = (parsed.path or "").lower()
 
     badge_hosts = {
-        "img.shields.io", "badge.fury.io", "badges.gitter.im",
-        "badgen.net", "flat.badgen.net", "codecov.io", "coveralls.io",
+        "img.shields.io",
+        "badge.fury.io",
+        "badges.gitter.im",
+        "badgen.net",
+        "flat.badgen.net",
+        "codecov.io",
+        "coveralls.io",
     }
     if host in badge_hosts:
         return True

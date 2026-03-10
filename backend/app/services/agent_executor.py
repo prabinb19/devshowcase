@@ -268,9 +268,7 @@ async def _monitor_agent(
                     result = {}
 
                 # Upload extracted images from sandbox to R2
-                result = await _upload_agent_images(
-                    sandbox, run_id, result
-                )
+                result = await _upload_agent_images(sandbox, run_id, result)
 
                 await _save_agent_output(run_id, result)
                 await _update_run_status(run_id, RunStatus.completed)
@@ -412,7 +410,7 @@ async def _upload_agent_images(
         result["post_draft"]["screenshot_urls"] = r2_urls
         # Keep alt_texts aligned — trim to match R2 URL count
         alt_texts = result["post_draft"].get("alt_texts", [])
-        result["post_draft"]["alt_texts"] = alt_texts[:len(r2_urls)]
+        result["post_draft"]["alt_texts"] = alt_texts[: len(r2_urls)]
 
     return result
 
