@@ -95,12 +95,27 @@ export default function DraftsPage() {
                       {formatDate(draft.created_at)}
                     </span>
                   </div>
-                  <p className="text-sm text-win98-black">
-                    {draft.body.length > 120
-                      ? draft.body.slice(0, 120) + "..."
-                      : draft.body}
-                  </p>
-                  <div className="flex justify-end">
+                  {draft.status === "draft" ? (
+                    <Link href={`/drafts/${draft.id}/edit`} className="block hover:opacity-80">
+                      <p className="text-sm text-win98-black">
+                        {draft.body.length > 120
+                          ? draft.body.slice(0, 120) + "..."
+                          : draft.body}
+                      </p>
+                    </Link>
+                  ) : (
+                    <p className="text-sm text-win98-black">
+                      {draft.body.length > 120
+                        ? draft.body.slice(0, 120) + "..."
+                        : draft.body}
+                    </p>
+                  )}
+                  <div className="flex justify-end gap-2">
+                    {draft.status === "draft" && (
+                      <Link href={`/drafts/${draft.id}/edit`}>
+                        <Button className="text-xs">Edit</Button>
+                      </Link>
+                    )}
                     <Button
                       variant="danger"
                       className="text-xs"
