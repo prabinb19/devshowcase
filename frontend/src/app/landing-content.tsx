@@ -1,10 +1,17 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import Marquee from "react-fast-marquee";
 import { Button } from "@/components/ui/button";
 
 export function LandingContent() {
+  const [visitorNum, setVisitorNum] = useState("0000");
+
+  useEffect(() => {
+    setVisitorNum(String(Math.floor(Math.random() * 9000 + 1000)));
+  }, []);
+
   return (
     <div className="min-h-screen bg-win98-silver">
       {/* Hero */}
@@ -156,7 +163,7 @@ export function LandingContent() {
         <div className="mt-4 flex justify-center">
           <div className="bevel-inset bg-black px-4 py-2">
             <span className="font-mono text-sm text-win98-green">
-              You are visitor #000{Math.floor(Math.random() * 9000 + 1000)}
+              You are visitor #000{visitorNum}
             </span>
           </div>
         </div>
