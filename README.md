@@ -8,9 +8,43 @@
 
 ![DevShowcase Landing Page](docs/images/landing.jpeg)
 
-An AI agent app I built to learn how to secure self-hosted agent runtimes. I used three Microsoft security frameworks as checklists: the [OpenClaw threat analysis](https://www.microsoft.com/en-us/security/blog/2026/02/19/running-openclaw-safely-identity-isolation-runtime-risk/) (6 control domains), the [Security Development Lifecycle](https://www.microsoft.com/en-us/securityengineering/sdl/practices) (SDL), and the [Responsible AI Standard v2](https://www.microsoft.com/en-us/ai/principles-and-approach).
+AI-powered tool that turns GitHub repositories into LinkedIn posts. Paste a repo URL, the agent analyzes the code, captures screenshots, and generates a ready-to-publish post.
+
+## How It Works
+
+You paste a GitHub repo URL and the app runs a 4-stage LangGraph pipeline:
+
+1. **Ingest** - Fetches repo metadata, README, file tree, and config files from the GitHub API
+2. **Analyze** - Claude looks at the repo and identifies the project type, tech stack, and highlights
+3. **Capture** - Extracts images from the README or generates a branded project card
+4. **Generate** - Writes a LinkedIn post with a hook, body, alt texts, and first comment
+
+```
+Next.js Frontend --> FastAPI Backend --> LangGraph Pipeline --> PostgreSQL
+                                              |
+                                         E2B Sandbox
+                                      (AI agent runs here)
+```
+
+The AI agent runs inside an E2B sandbox — you can watch it work in real time:
+
+![AI agent running in sandbox](docs/images/sandbox_running.jpeg)
+
+You can edit the draft, preview how it will look on LinkedIn, and publish directly through OAuth.
+
+![Review and publish LinkedIn post](docs/images/linkedinpost.jpeg)
+
+## Tech Stack
+
+**Backend:** Python 3.12, FastAPI, LangGraph, SQLAlchemy, Anthropic SDK, httpx
+
+**Frontend:** Next.js 14, TypeScript, Tailwind CSS, NextAuth.js, SWR
+
+**Infrastructure:** PostgreSQL (Neon), Cloudflare R2, E2B (sandboxed execution), Railway, Vercel
 
 ## Background
+
+I built this app to learn how to secure self-hosted agent runtimes. I used three Microsoft security frameworks as checklists: the [OpenClaw threat analysis](https://www.microsoft.com/en-us/security/blog/2026/02/19/running-openclaw-safely-identity-isolation-runtime-risk/) (6 control domains), the [Security Development Lifecycle](https://www.microsoft.com/en-us/securityengineering/sdl/practices) (SDL), and the [Responsible AI Standard v2](https://www.microsoft.com/en-us/ai/principles-and-approach).
 
 I have been learning to build with AI agents recently and it is genuinely fun. Vibe coding is fun. But after talking to my mentor, I realized there is so much about security I do not know. If we cannot build securely with AI agents and tools, are we even building anything worth shipping?
 
@@ -18,7 +52,7 @@ That got me thinking. I found [this Microsoft article](https://www.microsoft.com
 
 The article is not a how-to guide. It is a threat analysis with hunting queries for Microsoft Defender XDR. But buried in there is a table that maps six security control domains (Identity, Endpoint & Host, Supply Chain, Network & Egress, Data Protection, Monitoring & Response) to concrete risks. I used those six domains as a starting point, then expanded into two more Microsoft frameworks — the SDL for secure coding practices and the Responsible AI Standard for AI-specific safety.
 
-The app itself takes a GitHub repo URL, runs it through an AI pipeline (analyze the code, capture screenshots, generate a LinkedIn post), and lets you publish it. The interesting part was going back through my own code and finding all the security holes. There were a lot.
+The interesting part was going back through my own code and finding all the security holes. There were a lot.
 
 ## Security Frameworks Applied
 
@@ -68,38 +102,6 @@ The [Responsible AI Standard](https://www.microsoft.com/en-us/ai/principles-and-
 | **Network & Egress** | SSRF prevention (#6), CSP headers (#10), CORS hardening (#11) |
 | **Data Protection** | Prompt injection defense (#4), error sanitization (#7), content safety filter (#12), AI disclosure (#13) |
 | **Monitoring & Response** | Structured audit logging (#9) |
-
-## How the App Works
-
-You paste a GitHub repo URL and the app runs a 4-stage LangGraph pipeline:
-
-1. **Ingest** - Fetches repo metadata, README, file tree, and config files from the GitHub API
-2. **Analyze** - Claude looks at the repo and identifies the project type, tech stack, and highlights
-3. **Capture** - Extracts images from the README or generates a branded project card
-4. **Generate** - Writes a LinkedIn post with a hook, body, alt texts, and first comment
-
-```
-Next.js Frontend --> FastAPI Backend --> LangGraph Pipeline --> PostgreSQL
-                                              |
-                                         E2B Sandbox
-                                      (AI agent runs here)
-```
-
-The AI agent runs inside an E2B sandbox — you can watch it work in real time:
-
-![AI agent running in sandbox](docs/images/sandbox_running.jpeg)
-
-You can edit the draft, preview how it will look on LinkedIn, and publish directly through OAuth.
-
-![Review and publish LinkedIn post](docs/images/linkedinpost.jpeg)
-
-## Tech Stack
-
-**Backend:** Python 3.12, FastAPI, LangGraph, SQLAlchemy, Anthropic SDK, httpx
-
-**Frontend:** Next.js 14, TypeScript, Tailwind CSS, NextAuth.js, SWR
-
-**Infrastructure:** PostgreSQL (Neon), Cloudflare R2, E2B (sandboxed execution), Railway, Vercel
 
 ## Local Development
 
