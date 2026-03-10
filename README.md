@@ -4,7 +4,9 @@
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12+-3776AB.svg)](https://python.org)
 [![Next.js 14](https://img.shields.io/badge/Next.js-14-black.svg)](https://nextjs.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com)
-[![Tests](https://img.shields.io/badge/Tests-151_passing-brightgreen.svg)](#running-tests)
+[![Tests](https://img.shields.io/badge/Tests-155_passing-brightgreen.svg)](#running-tests)
+
+![DevShowcase Landing Page](docs/images/landing.jpeg)
 
 An AI agent app I built to learn how to secure self-hosted agent runtimes. I used three Microsoft security frameworks as checklists: the [OpenClaw threat analysis](https://www.microsoft.com/en-us/security/blog/2026/02/19/running-openclaw-safely-identity-isolation-runtime-risk/) (6 control domains), the [Security Development Lifecycle](https://www.microsoft.com/en-us/securityengineering/sdl/practices) (SDL), and the [Responsible AI Standard v2](https://www.microsoft.com/en-us/ai/principles-and-approach).
 
@@ -83,7 +85,13 @@ Next.js Frontend --> FastAPI Backend --> LangGraph Pipeline --> PostgreSQL
                                       (AI agent runs here)
 ```
 
+The AI agent runs inside an E2B sandbox — you can watch it work in real time:
+
+![AI agent running in sandbox](docs/images/sandbox_running.jpeg)
+
 You can edit the draft, preview how it will look on LinkedIn, and publish directly through OAuth.
+
+![Review and publish LinkedIn post](docs/images/linkedinpost.jpeg)
 
 ## Tech Stack
 
@@ -117,7 +125,7 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 cp .env.example .env  # fill in API keys
 alembic upgrade head
-uvicorn app.main:app --reload
+make dev
 
 # Frontend (in another terminal)
 cd frontend
@@ -126,6 +134,8 @@ cp .env.example .env.local  # fill in OAuth credentials
 npm run dev
 ```
 
+For the complete setup guide (API key walkthroughs, troubleshooting, architecture details), see [docs/local-setup.md](docs/local-setup.md).
+
 ### Environment Variables
 
 **Backend** (`.env`):
@@ -133,12 +143,14 @@ npm run dev
 | Variable | Description |
 |----------|-------------|
 | `DATABASE_URL` | PostgreSQL connection string |
-| `ANTHROPIC_API_KEY` | Anthropic API key for Claude |
+| `ANTHROPIC_API_KEY` | Anthropic API key for Claude (powers analysis and generation) |
+| `GEMINI_API_KEY` | Gemini API key (powers the E2B sandbox agent) |
 | `GITHUB_TOKEN` | GitHub personal access token |
+| `E2B_API_KEY` | E2B API key (sandbox runtime for the agent) |
 | `TOKEN_ENCRYPTION_KEY` | Fernet key for encrypting OAuth tokens at rest |
 | `NEXTAUTH_SECRET` | Shared secret for JWT verification with frontend |
-| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME` | Cloudflare R2 credentials |
-| `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET` | LinkedIn OAuth app credentials |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME` | Cloudflare R2 credentials (optional) |
+| `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET` | LinkedIn OAuth app credentials (optional) |
 
 **Frontend** (`.env.local`):
 
@@ -156,7 +168,7 @@ cd backend
 .venv/bin/python -m pytest tests/ -v
 ```
 
-151 tests covering pipeline nodes, API routes, security controls, and services. All mocked, no API keys needed.
+155 tests covering pipeline nodes, API routes, security controls, and services. All mocked, no API keys needed.
 
 Security-specific tests:
 
