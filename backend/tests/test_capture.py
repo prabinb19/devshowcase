@@ -155,8 +155,8 @@ class TestUploadImage:
         mock_get_client.return_value = MagicMock()
 
         url = upload_image(b"image data", "run-456", "img.png")
-        assert "test-bucket.r2.dev" in url
-        assert "run-456" in url
+        assert url.startswith("/api/backend/images/run-456/")
+        assert "img.png" in url
 
     @patch("app.services.r2_storage._get_r2_client")
     @patch("app.services.r2_storage.settings")
