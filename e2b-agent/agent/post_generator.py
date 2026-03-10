@@ -67,8 +67,8 @@ def generate_post(
         "platform": "linkedin",
         "body": result.get("body", ""),
         "first_comment": result.get("first_comment", ""),
-        "screenshot_urls": result.get("screenshot_urls", image_urls),
-        "alt_texts": result.get("alt_texts", alt_texts),
+        "screenshot_urls": result.get("screenshot_urls") or image_urls,
+        "alt_texts": result.get("alt_texts") or alt_texts,
         "status": "draft",
     }
 

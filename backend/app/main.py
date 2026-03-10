@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from app.config import settings
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.routes.drafts import router as drafts_router
+from app.routes.images import router as images_router
 from app.routes.linkedin import router as linkedin_router
 from app.routes.runs import router as runs_router
 from app.routes.settings import router as settings_router
@@ -59,6 +60,7 @@ app.add_middleware(RateLimitMiddleware)
 
 app.include_router(runs_router, prefix="/api")
 app.include_router(drafts_router, prefix="/api")
+app.include_router(images_router, prefix="/api")
 app.include_router(linkedin_router, prefix="/api")
 app.include_router(settings_router, prefix="/api")
 

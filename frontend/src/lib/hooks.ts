@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import { useEffect, useRef, useState, useCallback } from "react";
 import type { SSEEvent } from "@/types";
 
-interface AppUser {
+export interface AppUser {
   name?: string | null;
   email?: string | null;
   image?: string | null;
@@ -13,8 +13,8 @@ interface AppUser {
 }
 
 export function useUser(): AppUser | null {
-  const { data: session } = useSession();
-  if (!session?.user) return null;
+  const { data: session, status } = useSession();
+  if (status === "loading" || !session?.user) return null;
   const u = session.user as Record<string, unknown>;
   return {
     name: u.name as string | null,
@@ -22,6 +22,23 @@ export function useUser(): AppUser | null {
     image: u.image as string | null,
     githubId: (u.githubId as string) ?? "",
     githubUsername: (u.githubUsername as string) ?? "",
+  };
+}
+
+export function useAuthStatus(): { user: AppUser | null; isLoading: boolean } {
+  const { data: session, status } = useSession();
+  if (status === "loading") return { user: null, isLoading: true };
+  if (!session?.user) return { user: null, isLoading: false };
+  const u = session.user as Record<string, unknown>;
+  return {
+    user: {
+      name: u.name as string | null,
+      email: u.email as string | null,
+      image: u.image as string | null,
+      githubId: (u.githubId as string) ?? "",
+      githubUsername: (u.githubUsername as string) ?? "",
+    },
+    isLoading: false,
   };
 }
 

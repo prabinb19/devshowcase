@@ -6,13 +6,13 @@ import { Navbar } from "@/components/navbar";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useUser } from "@/lib/hooks";
+import { useAuthStatus } from "@/lib/hooks";
 import { createRun } from "@/lib/api";
 
 const GITHUB_REPO_RE = /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/?$/;
 
 export default function DashboardPage() {
-  const user = useUser();
+  const { user, isLoading: authLoading } = useAuthStatus();
   const router = useRouter();
   const [repoUrl, setRepoUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -30,8 +30,9 @@ export default function DashboardPage() {
       }
     }
 
+    if (authLoading) return;
     if (!user) {
-      setError("Not signed in");
+      setError("Not signed in — please refresh the page");
       return;
     }
 

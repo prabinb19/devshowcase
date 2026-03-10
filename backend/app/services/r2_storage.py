@@ -50,6 +50,23 @@ def upload_image(
         ContentType=content_type,
     )
 
-    public_url = f"https://{settings.r2_bucket_name}.r2.dev/{key}"
-    logger.info("Uploaded %s to R2: %s", filename, public_url)
-    return public_url
+    # Return a backend-proxy URL so images load without R2 public access.
+    # Frontend proxies /api/backend/* → backend /api/*, so store the full
+    # frontend-accessible path.
+    proxy_url = f"/api/backend/images/{run_id}/{content_hash}_{filename}"
+    logger.info("Uploaded %s to R2: %s", filename, proxy_url)
+    return proxy_url
+
+
+def download_image(key: str) -> bytes | None:
+    """Download an image from R2 by key. Returns bytes or None."""
+    try:
+        client = _get_r2_client()
+        response = client.get_object(
+            Bucket=settings.r2_bucket_name,
+            Key=key,
+        )
+        return response["Body"].read()
+    except Exception:
+        logger.exception("Failed to download from R2: %s", key)
+        return None

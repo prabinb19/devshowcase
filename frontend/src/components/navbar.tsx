@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { signOut } from "next-auth/react";
-import { useUser } from "@/lib/hooks";
+import { useAuthStatus } from "@/lib/hooks";
 
 const NAV_LINKS = [
   { href: "/dashboard", label: "Dashboard" },
@@ -14,7 +14,7 @@ const NAV_LINKS = [
 ];
 
 export function Navbar() {
-  const user = useUser();
+  const { user, isLoading } = useAuthStatus();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -40,7 +40,9 @@ export function Navbar() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {user && (
+          {isLoading ? (
+            <div className="h-8 w-24 animate-pulse bg-win98-darkgray/20 bevel-inset" />
+          ) : user ? (
             <>
               {user.image && (
                 <div className="bevel-inset p-0.5">
@@ -62,7 +64,7 @@ export function Navbar() {
                 Sign out
               </button>
             </>
-          )}
+          ) : null}
           {/* Mobile menu button */}
           <button
             onClick={() => setMobileOpen(!mobileOpen)}

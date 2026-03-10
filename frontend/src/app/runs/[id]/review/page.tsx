@@ -254,6 +254,7 @@ export default function ReviewPage() {
                               src={url}
                               alt={displayAltTexts[idx] ?? `Screenshot ${idx + 1}`}
                               fill
+                              unoptimized
                               className="object-cover"
                             />
                           </div>
@@ -325,6 +326,7 @@ export default function ReviewPage() {
                       src={selectedUrls[0]}
                       alt="Post image"
                       fill
+                      unoptimized
                       className="object-cover"
                     />
                   </div>

@@ -1,9 +1,12 @@
 """DevShowcase agent — runs inside E2B sandbox."""
 
 import json
+import logging
 import os
 import sys
 import traceback
+
+logging.basicConfig(level=logging.INFO, format="%(name)s: %(message)s")
 
 from comms import read_mission, update_progress, set_status
 from explorer import explore_repo
@@ -27,7 +30,11 @@ def main() -> None:
 
         # Step 2: Extract images
         update_progress("extracting_images", "Extracting README images...")
-        images = extract_images(exploration.get("readme", ""), repo_url)
+        images = extract_images(
+            exploration.get("readme", ""),
+            repo_url,
+            exploration.get("default_branch", "main"),
+        )
 
         # Step 3: Generate post
         update_progress("generating", "Generating LinkedIn post with Gemini...")

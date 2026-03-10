@@ -15,6 +15,8 @@ from e2b.sandbox.commands.command_handle import CommandExitException
 from app.config import settings
 from app.database import async_session
 from app.models import Run, RunStatus
+from app.services.image_processor import validate_image, process_image
+from app.services.r2_storage import upload_image
 
 # Agent source files live alongside this repo
 _AGENT_SRC_DIR = Path(__file__).resolve().parents[3] / "e2b-agent" / "agent"
@@ -265,6 +267,11 @@ async def _monitor_agent(
                 except Exception:
                     result = {}
 
+                # Upload extracted images from sandbox to R2
+                result = await _upload_agent_images(
+                    sandbox, run_id, result
+                )
+
                 await _save_agent_output(run_id, result)
                 await _update_run_status(run_id, RunStatus.completed)
                 queue.put_nowait(
@@ -368,6 +375,46 @@ async def _update_run_status(
             if error is not None:
                 run.error = error
             await session.commit()
+
+
+async def _upload_agent_images(
+    sandbox: DesktopSandbox, run_id: uuid.UUID, result: dict
+) -> dict:
+    """Download images from sandbox /output/images/ and upload to R2.
+
+    Replaces screenshot_urls in result with public R2 URLs.
+    """
+    images = result.get("images", [])
+    if not images:
+        return result
+
+    r2_urls: list[str] = []
+    for img in images:
+        local_path = img.get("local_path", "")
+        if not local_path:
+            continue
+        try:
+            raw_bytes = await asyncio.to_thread(
+                sandbox.files.read, local_path, format="bytes"
+            )
+            if not raw_bytes or not validate_image(raw_bytes):
+                logger.warning("Invalid image from sandbox: %s", local_path)
+                continue
+            processed = process_image(raw_bytes, max_width=1200, max_height=1200)
+            filename = Path(local_path).name
+            url = upload_image(processed, str(run_id), filename)
+            r2_urls.append(url)
+            logger.info("Uploaded agent image to R2: %s", url)
+        except Exception:
+            logger.exception("Failed to upload agent image %s", local_path)
+
+    if r2_urls and "post_draft" in result:
+        result["post_draft"]["screenshot_urls"] = r2_urls
+        # Keep alt_texts aligned — trim to match R2 URL count
+        alt_texts = result["post_draft"].get("alt_texts", [])
+        result["post_draft"]["alt_texts"] = alt_texts[:len(r2_urls)]
+
+    return result
 
 
 async def _save_agent_output(run_id: uuid.UUID, output: dict) -> None:

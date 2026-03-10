@@ -40,6 +40,9 @@ def explore_repo(repo_url: str, github_token: str) -> dict:
     # Extract repo name from URL
     name = repo_url.rstrip("/").split("/")[-1].removesuffix(".git")
 
+    # Detect default branch
+    default_branch = _detect_default_branch()
+
     # Read README
     readme = _read_readme()
 
@@ -52,10 +55,23 @@ def explore_repo(repo_url: str, github_token: str) -> dict:
     return {
         "repo_url": repo_url,
         "name": name,
+        "default_branch": default_branch,
         "readme": readme,
         "file_tree": file_tree,
         "config_files": config_files,
     }
+
+
+def _detect_default_branch() -> str:
+    """Get the default branch name from the cloned repo."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(REPO_DIR), "rev-parse", "--abbrev-ref", "HEAD"],
+            capture_output=True, text=True, check=True,
+        )
+        return result.stdout.strip() or "main"
+    except Exception:
+        return "main"
 
 
 def _read_readme() -> str:

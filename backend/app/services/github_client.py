@@ -174,15 +174,41 @@ async def fetch_config_files(
     return configs
 
 
+def _is_badge_url(url: str) -> bool:
+    """Return True if the URL looks like a badge/shield image (not a real screenshot)."""
+    parsed = urlparse(url)
+    host = parsed.hostname or ""
+    path_lower = (parsed.path or "").lower()
+
+    badge_hosts = {
+        "img.shields.io", "badge.fury.io", "badges.gitter.im",
+        "badgen.net", "flat.badgen.net", "codecov.io", "coveralls.io",
+    }
+    if host in badge_hosts:
+        return True
+    if "/badge/" in path_lower or "/badges/" in path_lower:
+        return True
+    if "/actions/workflows/" in path_lower:
+        return True
+    if path_lower.endswith(".svg"):
+        return True
+    return False
+
+
 def extract_readme_images(readme_md: str) -> list[str]:
-    """Extract image URLs from markdown (![alt](url) and <img src="url">)."""
+    """Extract image URLs from markdown, filtering badges and prioritizing content images."""
     md_images = _MD_IMAGE_RE.findall(readme_md)
     html_images = _HTML_IMG_RE.findall(readme_md)
     # Deduplicate while preserving order
     seen: set[str] = set()
-    result: list[str] = []
+    content: list[str] = []
+    badges: list[str] = []
     for url in md_images + html_images:
         if url not in seen:
             seen.add(url)
-            result.append(url)
-    return result
+            if _is_badge_url(url):
+                badges.append(url)
+            else:
+                content.append(url)
+    # Content images first, badges last (badges will likely be skipped by MAX_IMAGES)
+    return content + badges
