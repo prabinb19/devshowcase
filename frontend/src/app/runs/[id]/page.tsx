@@ -132,7 +132,11 @@ export default function RunStatusPage() {
 
   const { events, isDone, error: sseError, streamUrl, pendingQuestion, clearQuestion } = useSSE(getSSEUrl(id, streamToken));
   const { data: run } = useSWR(`/run/${id}`, () => getRun(id), {
-    refreshInterval: 3000,
+    refreshInterval: (latestData) => {
+      const s = latestData?.status;
+      if (s === "completed" || s === "failed") return 0; // stop polling
+      return 3000;
+    },
   });
 
   const currentStatus: RunStatus = run?.status ?? "pending";
@@ -186,7 +190,7 @@ export default function RunStatusPage() {
           </div>
 
           {sseError && (
-            <p className="mt-4 text-sm text-win98-yellow font-bold">{sseError} (using polling fallback)</p>
+            <p className="mt-4 text-sm text-orange-600 font-bold">{sseError} (using polling fallback)</p>
           )}
 
           {isFailed && (

@@ -11,8 +11,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 import * as jose from "jose";
 
+// Server-only env var for Docker; falls back to the public URL for local dev
 const BACKEND_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+  process.env.BACKEND_INTERNAL_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 async function proxyRequest(
   request: NextRequest,
