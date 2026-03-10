@@ -11,12 +11,33 @@
 
 ---
 
-## Step 1: Clone & Start PostgreSQL
+## Step 1: Clone & Start Services
 
 ```bash
 git clone https://github.com/prabinb19/devshowcase.git
 cd devshowcase
-docker compose up -d
+```
+
+### Option A: Full Stack with Docker (recommended)
+
+After configuring env files (Steps 2-3), run everything in one command:
+
+```bash
+make up
+```
+
+This starts PostgreSQL, backend, and frontend together. The backend and frontend containers mount your source code for hot-reloading.
+
+- Frontend: [http://localhost:3000](http://localhost:3000)
+- Backend: [http://localhost:8000](http://localhost:8000)
+- PostgreSQL: `localhost:5432`
+
+### Option B: PostgreSQL Only (manual setup)
+
+If you prefer running backend and frontend outside Docker:
+
+```bash
+docker compose up -d postgres
 ```
 
 This starts Postgres 16 on `localhost:5432` with:
@@ -224,7 +245,20 @@ openssl rand -base64 32
 
 ---
 
-## Step 4: Set Up the Backend
+## Step 4: Set Up & Run
+
+### If using Docker (Option A from Step 1):
+
+```bash
+# Start everything
+make up
+```
+
+That's it. The backend runs migrations automatically on startup. Skip to Step 6.
+
+### If running manually (Option B from Step 1):
+
+**Backend:**
 
 ```bash
 cd backend
@@ -241,17 +275,14 @@ pip install -e ".[dev]"
 # Run database migrations
 alembic upgrade head
 
-# Start the backend server (auto-excludes .venv from reload watcher)
-make dev
+# Start the backend server (from repo root)
+cd ..
+make dev-backend
 ```
 
 Verify: open [http://localhost:8000/health](http://localhost:8000/health) — should return `{"status": "ok"}`
 
----
-
-## Step 5: Set Up the Frontend
-
-In a **new terminal**:
+**Frontend** (in a new terminal):
 
 ```bash
 cd frontend
@@ -259,11 +290,24 @@ cd frontend
 # Install dependencies
 npm install
 
-# Start the dev server
-npm run dev
+# Start the dev server (from repo root)
+cd ..
+make dev-frontend
 ```
 
 Verify: open [http://localhost:3000](http://localhost:3000)
+
+### Available Make Commands
+
+| Command | Description |
+|---------|-------------|
+| `make up` | Start full stack with Docker |
+| `make down` | Stop all containers |
+| `make dev-backend` | Run backend locally (requires .venv) |
+| `make dev-frontend` | Run frontend locally (requires node_modules) |
+| `make db-migrate` | Run Alembic migrations |
+| `make test` | Run backend tests |
+| `make lint` | Run ruff + eslint |
 
 ---
 
@@ -350,7 +394,8 @@ Tests use mocks — no real API keys needed.
 | Problem | Fix |
 | --- | --- |
 | `JWEDecryptionFailed` on login | Clear browser cookies for localhost, restart frontend |
-| `connection refused` on port 5432 | Run `docker compose up -d` and wait a few seconds |
+| `connection refused` on port 5432 | Run `docker compose up -d postgres` and wait a few seconds |
+| Docker build fails | Run `docker compose down` then `make up` to rebuild from scratch |
 | `ModuleNotFoundError` | Make sure you're using `.venv/bin/python`, not system Python |
 | CORS errors in browser | Ensure backend is running on port 8000, frontend on 3000 |
 | GitHub OAuth callback error | Verify callback URL is exactly `http://localhost:3000/api/auth/callback/github` |
@@ -427,6 +472,7 @@ devshowcase/
 │   └── e2b.toml                 # Template: devshowcase-desktop
 ├── docs/                        # Documentation
 │   └── local-setup.md           # This file
-├── docker-compose.yml           # Local Postgres
+├── docker-compose.yml           # Full stack: Postgres + backend + frontend
+├── Makefile                     # Root commands: up, down, dev-backend, dev-frontend, test, lint
 └── CLAUDE.md                    # Development guidelines
 ```

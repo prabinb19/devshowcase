@@ -107,18 +107,31 @@ The [Responsible AI Standard](https://www.microsoft.com/en-us/ai/principles-and-
 
 ### Prerequisites
 
-- Python 3.12+
-- Node.js 18+
-- Docker (for local PostgreSQL)
+- Docker & Docker Compose
+- Python 3.12+ (for running without Docker)
+- Node.js 18+ (for running without Docker)
 
-### Setup
+### Quick Start (Docker)
 
 ```bash
 git clone https://github.com/prabinb19/devshowcase.git
 cd devshowcase
 
-# Start PostgreSQL
-docker compose up -d
+# Copy and fill in env files
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env.local
+
+# Start everything (postgres + backend + frontend)
+make up
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+### Manual Setup (without Docker)
+
+```bash
+# Start PostgreSQL only
+docker compose up -d postgres
 
 # Backend
 cd backend
@@ -127,14 +140,28 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 cp .env.example .env  # fill in API keys
 alembic upgrade head
-make dev
+cd ..
+make dev-backend
 
 # Frontend (in another terminal)
 cd frontend
 npm install
 cp .env.example .env.local  # fill in OAuth credentials
-npm run dev
+cd ..
+make dev-frontend
 ```
+
+### Available Commands
+
+| Command | Description |
+|---------|-------------|
+| `make up` | Start full stack with Docker |
+| `make down` | Stop all containers |
+| `make dev-backend` | Run backend locally (requires .venv) |
+| `make dev-frontend` | Run frontend locally (requires node_modules) |
+| `make db-migrate` | Run Alembic migrations |
+| `make test` | Run backend tests |
+| `make lint` | Run ruff + eslint |
 
 For the complete setup guide (API key walkthroughs, troubleshooting, architecture details), see [docs/local-setup.md](docs/local-setup.md).
 
