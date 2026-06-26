@@ -61,7 +61,7 @@ export function LandingContent() {
               {
                 num: "2",
                 title: "AI Analyzes",
-                desc: "Claude identifies what makes the project interesting — tech stack, highlights, and the best screenshots to feature.",
+                desc: "The AI agent identifies what makes the project interesting — tech stack, highlights, and the best screenshots to feature.",
               },
               {
                 num: "3",
@@ -96,7 +96,7 @@ export function LandingContent() {
               },
               {
                 title: "Analyze",
-                desc: "Claude identifies the project type, tech stack, key highlights, and determines the best screenshot strategy.",
+                desc: "The agent identifies the project type, tech stack, key highlights, and determines the best screenshot strategy.",
               },
               {
                 title: "Capture",

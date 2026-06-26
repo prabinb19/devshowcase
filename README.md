@@ -12,18 +12,18 @@ AI-powered tool that turns GitHub repositories into LinkedIn posts. Paste a repo
 
 ## How It Works
 
-You paste a GitHub repo URL and the app runs a 4-stage LangGraph pipeline:
+You paste a GitHub repo URL and the backend launches an autonomous agent inside an E2B sandbox that works through 4 stages:
 
-1. **Ingest** - Fetches repo metadata, README, file tree, and config files from the GitHub API
-2. **Analyze** - Claude looks at the repo and identifies the project type, tech stack, and highlights
+1. **Ingest** - Clones the repo and reads metadata, README, file tree, and config files
+2. **Analyze** - The agent identifies the project type, tech stack, and highlights
 3. **Capture** - Extracts images from the README or generates a branded project card
 4. **Generate** - Writes a LinkedIn post with a hook, body, alt texts, and first comment
 
 ```
-Next.js Frontend --> FastAPI Backend --> LangGraph Pipeline --> PostgreSQL
+Next.js Frontend --> FastAPI Backend --> E2B Sandbox --> PostgreSQL
                                               |
-                                         E2B Sandbox
-                                      (AI agent runs here)
+                                       (AI agent runs here,
+                                        streamed live via SSE)
 ```
 
 The AI agent runs inside an E2B sandbox — you can watch it work in real time:
@@ -36,7 +36,7 @@ You can edit the draft, preview how it will look on LinkedIn, and publish direct
 
 ## Tech Stack
 
-**Backend:** Python 3.12, FastAPI, LangGraph, SQLAlchemy, Anthropic SDK, httpx
+**Backend:** Python 3.12, FastAPI, SQLAlchemy, Google Gen AI SDK, httpx
 
 **Frontend:** Next.js 14, TypeScript, Tailwind CSS, NextAuth.js, SWR
 
@@ -85,12 +85,11 @@ The [SDL](https://www.microsoft.com/en-us/securityengineering/sdl/practices) def
 
 ### 3. Microsoft Responsible AI Standard v2
 
-The [Responsible AI Standard](https://www.microsoft.com/en-us/ai/principles-and-approach) defines six principles: fairness, reliability & safety, privacy & security, inclusiveness, transparency, and accountability. Two gaps stood out — no content safety filtering on LLM output, and no disclosure that content is AI-generated.
+The [Responsible AI Standard](https://www.microsoft.com/en-us/ai/principles-and-approach) defines six principles: fairness, reliability & safety, privacy & security, inclusiveness, transparency, and accountability. One gap stood out — no disclosure that content is AI-generated.
 
 | # | Fix | RAI Principle | What changed |
 |---|-----|---------------|--------------|
-| 12 | LLM Output Content Safety Filter | Reliability & Safety | Added a blocklist that catches violent language, hateful content, credential leaks, prompt injection echoes, role hijack echoes, and system prompt leaks before storing any AI-generated draft |
-| 13 | AI Transparency Disclosure | Transparency | Added an "AI-Generated Content" banner on the review page with a link to Microsoft's Responsible AI principles. Also aligns with the [AI Code of Conduct](https://learn.microsoft.com/en-us/legal/ai-code-of-conduct) (no deceptive AI content) |
+| 12 | AI Transparency Disclosure | Transparency | Added an "AI-Generated Content" banner on the review page with a link to Microsoft's Responsible AI principles. Also aligns with the [AI Code of Conduct](https://learn.microsoft.com/en-us/legal/ai-code-of-conduct) (no deceptive AI content) |
 
 ### Coverage Summary
 
@@ -100,7 +99,7 @@ The [Responsible AI Standard](https://www.microsoft.com/en-us/ai/principles-and-
 | **Endpoint & Host** | Sandbox secrets scoping (#5) |
 | **Supply Chain** | Dependency pinning (#8) |
 | **Network & Egress** | SSRF prevention (#6), CSP headers (#10), CORS hardening (#11) |
-| **Data Protection** | Prompt injection defense (#4), error sanitization (#7), content safety filter (#12), AI disclosure (#13) |
+| **Data Protection** | Prompt injection defense (#4), error sanitization (#7), AI disclosure (#12) |
 | **Monitoring & Response** | Structured audit logging (#9) |
 
 ## Local Development
@@ -172,7 +171,6 @@ For the complete setup guide (API key walkthroughs, troubleshooting, architectur
 | Variable | Description |
 |----------|-------------|
 | `DATABASE_URL` | PostgreSQL connection string |
-| `ANTHROPIC_API_KEY` | Anthropic API key for Claude (powers analysis and generation) |
 | `GEMINI_API_KEY` | Gemini API key (powers the E2B sandbox agent) |
 | `GITHUB_TOKEN` | GitHub personal access token |
 | `E2B_API_KEY` | E2B API key (sandbox runtime for the agent) |
@@ -197,12 +195,12 @@ cd backend
 .venv/bin/python -m pytest tests/ -v
 ```
 
-155 tests covering pipeline nodes, API routes, security controls, and services. All mocked, no API keys needed.
+31 tests covering API routes, security controls, and services. All mocked, no API keys needed.
 
 Security-specific tests:
 
 ```bash
-.venv/bin/python -m pytest tests/ -v -k "auth or forbidden or state or ssrf or audit or error or content_safety"
+.venv/bin/python -m pytest tests/ -v -k "auth or forbidden or ssrf or audit"
 ```
 
 ## Deployment

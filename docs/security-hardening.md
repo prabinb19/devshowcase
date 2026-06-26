@@ -35,7 +35,7 @@ The SDL defines secure coding practices across five phases: requirements, design
 
 Source: [Responsible AI Principles](https://www.microsoft.com/en-us/ai/principles-and-approach) · [Responsible AI Standard v2 (PDF)](https://msblogs.thesourcemediaassets.com/sites/5/2022/06/Microsoft-Responsible-AI-Standard-v2-General-Requirements-3.pdf) · [AI Code of Conduct](https://learn.microsoft.com/en-us/legal/ai-code-of-conduct)
 
-The Responsible AI Standard defines six principles: fairness, reliability & safety, privacy & security, inclusiveness, transparency, and accountability. The AI Code of Conduct defines customer requirements for using Microsoft AI services, aligned with the EU AI Act. Two principles had gaps in our app: no content safety filtering on LLM output (reliability & safety), and no disclosure that content is AI-generated (transparency + no deceptive AI content).
+The Responsible AI Standard defines six principles: fairness, reliability & safety, privacy & security, inclusiveness, transparency, and accountability. The AI Code of Conduct defines customer requirements for using Microsoft AI services, aligned with the EU AI Act. One principle had a gap in our app: no disclosure that content is AI-generated (transparency + no deceptive AI content).
 
 ---
 
@@ -288,32 +288,22 @@ mission = {
 
 | File | Change |
 |------|--------|
-| `backend/app/services/screenshot/readme_images.py:22-55` | `_validate_image_url()` with blocked hosts + private IP rejection |
-| `backend/app/services/linkedin_client.py:27-52` | Identical validation before image upload |
+| `backend/app/services/linkedin_client.py:37-56` | `_validate_image_url()` rejects unsupported schemes, blocked metadata hosts, and hostnames resolving to private/reserved IPs before image upload |
 
 ### How to Test
 
-**Automated tests:**
-```bash
-cd backend && .venv/bin/python -m pytest tests/ -v -k "ssrf or validate_image or blocked"
-```
-
-**Manual verification — test blocked URLs:**
+**Manual verification — blocked URLs raise `ValueError`:**
 ```python
-from backend.app.services.screenshot.readme_images import _validate_image_url
+from app.services.linkedin_client import _validate_image_url
 
-# Cloud metadata endpoints → blocked
-_validate_image_url("http://169.254.169.254/latest/meta-data/")     # False
-_validate_image_url("http://metadata.google.internal/")              # False
-_validate_image_url("http://metadata.azure.com/")                    # False
+# Cloud metadata endpoints & private/reserved IPs → raise ValueError
+_validate_image_url("http://169.254.169.254/latest/meta-data/")  # raises
+_validate_image_url("http://metadata.google.internal/")          # raises
+_validate_image_url("http://192.168.1.1/image.png")              # raises
+_validate_image_url("http://127.0.0.1/image.png")                # raises
 
-# Private IPs → blocked
-_validate_image_url("http://192.168.1.1/image.png")                 # False
-_validate_image_url("http://10.0.0.1/image.png")                    # False
-_validate_image_url("http://127.0.0.1/image.png")                   # False
-
-# Valid external URL → allowed
-_validate_image_url("https://github.com/user/repo/raw/main/img.png") # True
+# Valid external URL → passes (no exception)
+_validate_image_url("https://github.com/user/repo/raw/main/img.png")
 ```
 
 ### How to See It Work
@@ -540,46 +530,11 @@ curl -sI -X OPTIONS -H "Origin: http://localhost:3000" \
 
 ## Responsible AI Fixes
 
-The following fixes address gaps identified by mapping the codebase against the [Microsoft Responsible AI Standard v2](https://www.microsoft.com/en-us/ai/principles-and-approach) and the [AI Code of Conduct](https://learn.microsoft.com/en-us/legal/ai-code-of-conduct). The app generates AI content that users publish publicly on LinkedIn — two principles needed attention: content safety (reliability & safety) and transparency (AI disclosure).
+The following fix addresses a gap identified by mapping the codebase against the [Microsoft Responsible AI Standard v2](https://www.microsoft.com/en-us/ai/principles-and-approach) and the [AI Code of Conduct](https://learn.microsoft.com/en-us/legal/ai-code-of-conduct). The app generates AI content that users publish publicly on LinkedIn, so transparency (AI disclosure) needed attention.
 
 ---
 
-## Fix 12 — LLM Output Content Safety Filter
-
-**Severity:** Medium
-**Microsoft Domain:** Data Protection
-**RAI Principle:** Reliability & Safety
-**Principle:** *"Reduce the chance that sensitive data is exfiltrated by agent tools."*
-
-### What Changed
-
-| File | Change |
-|------|--------|
-| `backend/app/services/content_safety.py` | New module: regex-based blocklist for violent, hateful, credential leak, prompt injection echo, and system prompt leak patterns |
-| `backend/app/nodes/generate.py` | Integrated `validate_post_content()` after Claude response, before storing draft |
-| `backend/tests/test_content_safety.py` | 12 tests covering clean content, length clamping, and all blocked categories |
-
-### Blocked Pattern Categories
-
-| Category | Example Match | Reason |
-|----------|--------------|--------|
-| Violent language | "kill the competition" | Harmful content |
-| Hateful language | "racial classification" | Discriminatory content |
-| Credential leak | "api key is sk-123" | Sensitive data exfiltration |
-| Prompt injection echo | "ignore all previous instructions" | LLM manipulation leak |
-| Role hijack echo | "you are now a different AI" | LLM manipulation leak |
-| System prompt leak | "the system prompt says" | Internal instruction disclosure |
-
-### How to Test
-
-```bash
-cd backend && .venv/bin/python -m pytest tests/test_content_safety.py -v
-# 12 tests, all passing
-```
-
----
-
-## Fix 13 — AI Transparency Disclosure
+## Fix 12 — AI Transparency Disclosure
 
 **Severity:** Low
 **Microsoft Domain:** Data Protection (Transparency sub-principle)
@@ -614,8 +569,7 @@ Navigate to any `/runs/{id}/review` page — the disclosure banner appears above
 | 9. Audit Logging | | | | | | **●** |
 | 10. CSP Headers | | | | **●** | **●** | |
 | 11. CORS Hardening | | | | **●** | | |
-| 12. Content Safety | | | | | **●** | |
-| 13. AI Disclosure | | | | | **●** | |
+| 12. AI Disclosure | | | | | **●** | |
 
 **Full coverage across all 6 Microsoft security domains + Microsoft Responsible AI Standard + AI Code of Conduct.**
 
@@ -623,8 +577,8 @@ Navigate to any `/runs/{id}/review` page — the disclosure banner appears above
 
 | Framework | Principles Addressed |
 |-----------|---------------------|
-| [Microsoft SDL](https://www.microsoft.com/en-us/securityengineering/sdl/practices) | Secure defaults (CSP), minimize attack surface (CORS), input validation (content safety) |
-| [Microsoft Responsible AI Standard v2](https://www.microsoft.com/en-us/ai/principles-and-approach) | Reliability & Safety (content filter), Transparency (AI disclosure) |
+| [Microsoft SDL](https://www.microsoft.com/en-us/securityengineering/sdl/practices) | Secure defaults (CSP), minimize attack surface (CORS), input validation (SSRF URL checks) |
+| [Microsoft Responsible AI Standard v2](https://www.microsoft.com/en-us/ai/principles-and-approach) | Transparency (AI disclosure) |
 | [Microsoft AI Code of Conduct](https://learn.microsoft.com/en-us/legal/ai-code-of-conduct) | No deceptive AI content (disclosure badge) |
 
 ---
@@ -633,10 +587,10 @@ Navigate to any `/runs/{id}/review` page — the disclosure banner appears above
 
 ```bash
 cd backend && .venv/bin/python -m pytest tests/ -v
-# 151 tests, all passing
+# 31 tests, all passing
 ```
 
 To run only security-related tests:
 ```bash
-cd backend && .venv/bin/python -m pytest tests/ -v -k "auth or forbidden or state or ssrf or audit or error or content_safety"
+cd backend && .venv/bin/python -m pytest tests/ -v -k "auth or forbidden or state or audit or error"
 ```

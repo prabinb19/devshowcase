@@ -1,6 +1,6 @@
 # DevShowcase — Local Setup Guide
 
-> Complete setup for the full application: GitHub repo analysis via LangGraph pipeline (Claude + E2B agent), LinkedIn post generation, OAuth login, and publishing.
+> Complete setup for the full application: GitHub repo analysis via an autonomous E2B sandbox agent (Gemini), LinkedIn post generation, OAuth login, and publishing.
 
 ## Prerequisites
 
@@ -74,25 +74,16 @@ docker compose logs postgres
 4. Under **Repository access**, select **Public Repositories (read-only)**
 5. Click **Generate token** — copy it
 
-### 2c. Anthropic API Key (required — powers the backend pipeline)
+### 2c. Gemini API Key (required — powers the E2B sandbox agent)
 
-The backend LangGraph pipeline uses Claude for repo analysis and post generation.
-
-1. Go to [console.anthropic.com](https://console.anthropic.com/) and sign up
-2. Navigate to **API Keys** → **Create Key**
-3. Copy the key (starts with `sk-ant-...`)
-4. Claude Sonnet is used by default (configurable via `ANTHROPIC_MODEL`)
-
-### 2d. Gemini API Key (required — powers the E2B sandbox agent)
-
-The autonomous agent that runs inside the E2B sandbox uses Gemini for structured post generation.
+The autonomous agent that runs inside the E2B sandbox uses Gemini for repo analysis and structured post generation.
 
 1. Go to [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
 2. Click **Create API Key**
 3. Copy the key
 4. Gemini 2.5 Flash is used (free tier available)
 
-### 2e. E2B API Key (required — agent sandbox runtime)
+### 2d. E2B API Key (required — agent sandbox runtime)
 
 The E2B sandbox hosts the autonomous agent that clones repos, explores code, extracts images, and generates posts via Gemini.
 
@@ -102,7 +93,7 @@ The E2B sandbox hosts the autonomous agent that clones repos, explores code, ext
 
 **How it works:**
 
-The backend orchestrates a **LangGraph pipeline** with 5 nodes: ingest → analyze → generate → capture → error_handler. The **analyze** and **generate** nodes use Claude (Anthropic) for repo analysis and post drafting. The **capture** node spins up an E2B desktop sandbox to take screenshots. Separately, the E2B agent sandbox clones the repo, explores it with Gemini, extracts images, and writes results back. The backend streams progress to the frontend via SSE.
+The backend provisions an E2B sandbox and runs an autonomous agent inside it. The agent clones the repo, explores it with Gemini, identifies the project type and tech stack, extracts images from the README (or builds a project card), and drafts a LinkedIn post — writing results back to the backend. The backend streams progress to the frontend via SSE and stores the final draft.
 
 **Quick smoke test** (after setting `E2B_API_KEY` in `.env`):
 
@@ -135,7 +126,7 @@ Build the custom agent template for pre-installed dependencies:
 
 Without a custom template, the default E2B template is used (may be slower as it installs dependencies at runtime).
 
-### 2f. Cloudflare R2 (optional — for image storage)
+### 2e. Cloudflare R2 (optional — for image storage)
 
 > **You can skip this for local dev.** Images extracted from README files are stored in the sandbox and returned in the agent output. R2 is used for persistent cloud storage.
 
@@ -146,7 +137,7 @@ Without a custom template, the default E2B template is used (may be slower as it
 5. Set permissions to **Object Read & Write**, scope to your bucket
 6. Copy the **Access Key ID** and **Secret Access Key**
 
-### 2g. LinkedIn OAuth (optional — for publishing)
+### 2f. LinkedIn OAuth (optional — for publishing)
 
 > **Skip this unless you want to publish posts to LinkedIn.** The app works fully without it — you can generate, review, edit, and save drafts.
 
@@ -170,14 +161,6 @@ Edit `backend/.env`:
 ```env
 # Database (matches docker-compose.yml defaults)
 DATABASE_URL=postgresql+asyncpg://postgres:dev@localhost:5432/devshowcase
-
-# Anthropic (required — Claude powers repo analysis and post generation)
-ANTHROPIC_API_KEY=sk-ant-your-key-here
-# ANTHROPIC_MODEL=claude-sonnet-4-20250514
-
-# LangGraph checkpointer (optional — PostgreSQL psycopg3 URL for pipeline state)
-# Use standard postgresql:// (not asyncpg) — e.g. postgresql://postgres:dev@localhost:5432/devshowcase
-# CHECKPOINT_URL=
 
 # Gemini (required — powers the AI agent inside the E2B sandbox)
 GEMINI_API_KEY=your-gemini-api-key
@@ -317,13 +300,13 @@ Verify: open [http://localhost:3000](http://localhost:3000)
 2. Click **Sign in with GitHub**
 3. Authorize the OAuth app
 4. On the dashboard, paste a **public GitHub repo URL** (e.g. `https://github.com/fastapi/fastapi`)
-5. Watch the pipeline progress in real-time (ingesting → analyzing → generating → capturing → completed)
+5. Watch the agent progress in real-time (ingesting → analyzing → generating → capturing → completed)
 6. If the agent needs clarification, it will ask a question — answer it in the UI
 7. Review the generated LinkedIn post draft
 8. Edit the post body, first comment, select/deselect images, update alt texts
 9. Choose an action:
    - **Save as Draft** — saves to the drafts page for later
-   - **Publish to LinkedIn** — requires LinkedIn OAuth setup (Step 2g)
+   - **Publish to LinkedIn** — requires LinkedIn OAuth setup (Step 2f)
 10. Visit **Settings** to configure default tone and hashtag preferences
 11. Visit **History** to see previously published posts
 
@@ -401,7 +384,7 @@ Tests use mocks — no real API keys needed.
 | GitHub OAuth callback error | Verify callback URL is exactly `http://localhost:3000/api/auth/callback/github` |
 | LinkedIn OAuth callback error | Verify redirect URL is `http://localhost:3000/api/linkedin/callback` in LinkedIn app settings |
 | Agent stuck or timed out | Check E2B API key is valid, increase `AGENT_SANDBOX_TIMEOUT` if needed |
-| Sandbox fails to create | Verify `E2B_API_KEY` is set, or run the smoke test in Step 2e |
+| Sandbox fails to create | Verify `E2B_API_KEY` is set, or run the smoke test in Step 2d |
 | Agent question never appears | Check SSE connection — frontend must be connected to `/api/runs/{id}/stream` |
 | `422` on settings save | Check that tone is one of: professional, casual, technical, enthusiastic |
 | Tests fail with `ModuleNotFoundError` | Run tests with `.venv/bin/python -m pytest tests/ -v`, not `pytest` directly |
@@ -413,15 +396,12 @@ Tests use mocks — no real API keys needed.
 | Key | Required? | Impact if missing |
 | --- | --- | --- |
 | `DATABASE_URL` | **Yes** | Nothing works |
-| `ANTHROPIC_API_KEY` | **Yes** | Backend pipeline can't analyze repos or generate posts |
-| `GEMINI_API_KEY` | **Yes** | E2B sandbox agent can't generate posts |
+| `GEMINI_API_KEY` | **Yes** | E2B sandbox agent can't analyze repos or generate posts |
 | `GITHUB_TOKEN` | **Yes** | Agent can't clone repos |
 | `E2B_API_KEY` | **Yes** | Agent sandbox can't start |
 | `GITHUB_CLIENT_ID/SECRET` | **Yes** | Can't log in |
 | `NEXTAUTH_SECRET` | **Yes** | Auth won't work |
 | `TOKEN_ENCRYPTION_KEY` | **Yes** | Required for token storage (LinkedIn, future integrations) |
-| `ANTHROPIC_MODEL` | No | Defaults to `claude-sonnet-4-20250514` |
-| `CHECKPOINT_URL` | No | LangGraph pipeline state not persisted across restarts |
 | `E2B_TEMPLATE_ID` | No | Falls back to default E2B template (slower) |
 | `E2B_ENABLE_STREAM` | No | Defaults to `true` (live desktop stream) |
 | `PORTFOLIO_REPO/OWNER` | No | Portfolio PR feature disabled |
@@ -439,13 +419,11 @@ devshowcase/
 │   │   ├── main.py              # FastAPI entry point
 │   │   ├── config.py            # Pydantic settings
 │   │   ├── database.py          # SQLAlchemy async engine
-│   │   ├── graph.py             # LangGraph pipeline definition
 │   │   ├── middleware/           # Rate limiting
 │   │   ├── models/              # SQLAlchemy models (User, Run, Draft, Token)
-│   │   ├── nodes/               # LangGraph nodes (ingest, analyze, generate, capture, error_handler)
-│   │   ├── routes/              # API routes (runs, drafts, settings, linkedin)
+│   │   ├── routes/              # API routes (runs, drafts, settings, linkedin, images)
 │   │   ├── schemas/             # Pydantic request/response schemas
-│   │   └── services/            # Run executor, GitHub, R2, LinkedIn, image processing, LLM client
+│   │   └── services/            # Agent executor (E2B), R2, LinkedIn, image processing, encryption
 │   ├── alembic/                 # Database migrations (5 versions)
 │   ├── tests/                   # Unit tests
 │   ├── Dockerfile               # Production Docker image

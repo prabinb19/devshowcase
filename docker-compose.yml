@@ -26,7 +26,6 @@ services:
     environment:
       # Override localhost with Docker service name
       DATABASE_URL: postgresql+asyncpg://postgres:dev@postgres:5432/devshowcase
-      CHECKPOINT_URL: postgresql://postgres:dev@postgres:5432/devshowcase
     volumes:
       - ./backend/app:/app/app
       - ./backend/alembic:/app/alembic
